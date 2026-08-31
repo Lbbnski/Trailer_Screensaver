@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+# Registers the hack in xscreensaver's system-wide app-defaults file so it
+# shows up in xscreensaver-settings for every user without needing each
+# user's own ~/.xscreensaver edited (xscreensaver's driver merges any
+# "programs:" entries present here that a user's own dotfile doesn't
+# already override). Wrapped in markers so postrm can remove exactly this
+# block and nothing else a differently-packaged hack might have added.
+
+APP_DEFAULTS="/etc/X11/app-defaults/XScreenSaver"
+MARKER_BEGIN="# BEGIN steam-trailer-screensaver"
+MARKER_END="# END steam-trailer-screensaver"
+ENTRY='  "Steam Trailer Screensaver" steam-trailer-saver -root \n\'
+
+if [ "$1" = "configure" ] && [ -f "$APP_DEFAULTS" ]; then
+    if ! grep -qF "$MARKER_BEGIN" "$APP_DEFAULTS"; then
+        awk -v begin="$MARKER_BEGIN" -v entry="$ENTRY" -v end="$MARKER_END" '
+            { print }
+            /^\*programs:/ && !inserted { print begin; print entry; print end; inserted=1 }
+        ' "$APP_DEFAULTS" > "$APP_DEFAULTS.dpkg-new" \
+        && mv "$APP_DEFAULTS.dpkg-new" "$APP_DEFAULTS"
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

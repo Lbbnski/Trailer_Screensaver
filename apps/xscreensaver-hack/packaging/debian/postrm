@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+APP_DEFAULTS="/etc/X11/app-defaults/XScreenSaver"
+MARKER_BEGIN="# BEGIN steam-trailer-screensaver"
+MARKER_END="# END steam-trailer-screensaver"
+
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    if [ -f "$APP_DEFAULTS" ] && grep -qF "$MARKER_BEGIN" "$APP_DEFAULTS"; then
+        sed -i "/$MARKER_BEGIN/,/$MARKER_END/d" "$APP_DEFAULTS"
+    fi
+fi
+
+#DEBHELPER#
+
+exit 0

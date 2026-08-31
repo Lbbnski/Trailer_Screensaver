@@ -1,0 +1,12 @@
+{
+  "name": "steam-trailer-screensaver",
+  "version": "0.1.0",
+  "builtin-baseline": "abb6dda5cc32914d2e64d7d72b974dc301d1fc8a",
+  "dependencies": [
+    {
+      "name": "qtbase",
+      "features": ["sql-sqlite", "gui", "network", "widgets", "opengl"]
+    },
+    "sqlite3"
+  ]
+}

@@ -1,0 +1,17 @@
+# Build output
+/build/
+/vcpkg_installed/
+
+# Vendored libmpv SDK — obtained manually, not committed (see
+# cmake/FindLibmpv.cmake for where to get a compatible build)
+/third_party/mpv/
+
+# Claude Code session state
+/.claude/
+
+# IDE / OS
+.vs/
+*.user
+CMakeUserPresets.json
+.DS_Store
+Thumbs.db

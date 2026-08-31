@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Steam Trailer Screensaver Settings
+Comment=Configure genre/age filters and resolution for the Steam Trailer Screensaver
+Exec=/usr/lib/xscreensaver/steam-trailer-saver --configure
+Icon=preferences-desktop-screensaver
+Categories=Settings;

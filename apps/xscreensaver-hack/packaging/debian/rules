@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DBUILD_WIN_SCR=OFF \
+		-DBUILD_XSCREENSAVER_HACK=ON \
+		-DBUILD_SETTINGS_GUI=ON \
+		-DBUILD_TESTS=OFF

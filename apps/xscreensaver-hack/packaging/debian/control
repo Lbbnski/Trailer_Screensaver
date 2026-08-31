@@ -1,0 +1,15 @@
+Source: steam-trailer-screensaver
+Section: x11
+Priority: optional
+Maintainer: Steam Trailer Screensaver Project <noreply@example.invalid>
+Build-Depends: debhelper-compat (= 13), cmake, qt6-base-dev, libmpv-dev, pkg-config
+Standards-Version: 4.6.0
+
+Package: steam-trailer-screensaver
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, xscreensaver, libmpv2 (>= 0.35), yt-dlp
+Description: Steam game trailers as an xscreensaver hack
+ Plays streamed Steam store trailers (with a YouTube fallback for games
+ with no Steam-hosted trailer) as a classic xscreensaver hack, filterable
+ by genre and age rating. X11 only — see /usr/share/doc/steam-trailer-screensaver/LIMITATIONS
+ for why GNOME/Wayland isn't supported.

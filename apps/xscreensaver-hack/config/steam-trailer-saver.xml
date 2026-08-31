@@ -1,0 +1,34 @@
+<screensaver name="steam-trailer-saver" _label="Steam Trailer Screensaver">
+  <command arg="-window-id %"/>
+
+  <hgroup>
+    <select id="resolution">
+      <option id="max" _label="Maximum available quality"/>
+      <option id="480p" _label="480p (lower bandwidth)" arg-set="-max-resolution 480"/>
+    </select>
+  </hgroup>
+
+  <number id="max-age" type="slider" arg="-max-age %"
+          _label="Maximum age rating" low="0" high="18" default="18"/>
+
+  <boolean id="blacklist-mode" _label="Treat genre list below as a blacklist (hide these genres)"
+           arg-set="-genre-mode blacklist"/>
+  <string id="genres" _label="Genres (comma-separated)" arg="-genres %"/>
+
+  <_description>
+Plays Steam game trailers as a fullscreen screensaver, sourced from the
+Steam store catalog. If Steam has no trailer for a game, a YouTube search
+is used as a fallback for that game specifically, still filtered by the
+Steam-derived genre and age-rating metadata.
+
+Note: this panel only exposes simple options because xscreensaver's
+configuration format has no multi-select widget. For the full genre
+allow-list/blacklist picker (letting you choose exactly which genres show,
+rather than typing a comma-separated list here), run:
+
+    steam-trailer-saver --configure
+
+Changes made there are shared with this panel's resolution and age-rating
+settings, since both read and write the same configuration file.
+  </_description>
+</screensaver>
