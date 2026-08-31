@@ -53,7 +53,11 @@ bool titleLooksLikeMatch(const QString& gameTitle, const QString& videoTitle)
 
 } // namespace
 
-YoutubeFallbackResolver::YoutubeFallbackResolver(QString ytDlpPath) : m_ytDlpPath(std::move(ytDlpPath)) {}
+YoutubeFallbackResolver::YoutubeFallbackResolver(QString ytDlpPath, int maxDurationSeconds)
+    : m_ytDlpPath(std::move(ytDlpPath))
+    , m_maxDurationSeconds(maxDurationSeconds)
+{
+}
 
 TrailerRendition YoutubeFallbackResolver::renditionForVideoId(const QString& videoId)
 {
@@ -78,9 +82,11 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         : QStringLiteral("%1 %2 game trailer").arg(gameTitle, developer);
 
     // --flat-playlist avoids a full per-video extraction just to see
-    // candidates (fast, one HTTP round trip) at the cost of not knowing
-    // duration up front; with multiple results requested it prints one
-    // JSON object per line (JSON Lines) rather than a single document.
+    // candidates (fast, one HTTP round trip) — for a YouTube search
+    // specifically, the flat entries already include "duration", so this
+    // stays cheap even with the length filter below. With multiple results
+    // requested it prints one JSON object per line (JSON Lines) rather than
+    // a single document.
     const QStringList args{
         "--dump-json",
         "--flat-playlist",
@@ -107,15 +113,26 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         if (closestTitle.isEmpty())
             closestTitle = title;
 
-        if (titleLooksLikeMatch(gameTitle, title)) {
-            if (outVideoId) *outVideoId = id;
-            if (outQueryUsed) *outQueryUsed = query;
-            return renditionForVideoId(id);
+        if (!titleLooksLikeMatch(gameTitle, title))
+            continue;
+
+        // A missing/null duration (e.g. an unusual entry type) isn't
+        // treated as disqualifying on its own — only a duration we
+        // actually know exceeds the cap rejects the result.
+        const auto durationValue = obj.value("duration");
+        if (m_maxDurationSeconds > 0 && durationValue.isDouble() && durationValue.toInt() > m_maxDurationSeconds) {
+            logInfo(QStringLiteral("yt-dlp: \"%1\" is %2s, over the %3s cap — skipping (likely a Let's Play/walkthrough, not a trailer)")
+                        .arg(title).arg(durationValue.toInt()).arg(m_maxDurationSeconds));
+            continue;
         }
+
+        if (outVideoId) *outVideoId = id;
+        if (outQueryUsed) *outQueryUsed = query;
+        return renditionForVideoId(id);
     }
 
     if (!closestTitle.isEmpty()) {
-        logWarning(QStringLiteral("yt-dlp: no result for \"%1\" looked like a real match "
+        logWarning(QStringLiteral("yt-dlp: no result for \"%1\" looked like a real, right-length match "
                                    "(closest: \"%2\") — skipping fallback for this app")
                        .arg(gameTitle, closestTitle));
     }

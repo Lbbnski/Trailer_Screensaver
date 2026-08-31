@@ -93,6 +93,7 @@ QByteArray Config::toJson() const
         {"maxCatalogRequestsPerRun", advanced.maxCatalogRequestsPerRun},
         {"ytDlpPath", advanced.ytDlpPath},
         {"debugOverlay", advanced.debugOverlay},
+        {"maxTrailerDurationSeconds", advanced.maxTrailerDurationSeconds},
     };
 
     QJsonObject root{
@@ -146,6 +147,7 @@ Config Config::fromJson(const QByteArray& json, bool* ok)
     cfg.advanced.maxCatalogRequestsPerRun = advancedObj.value("maxCatalogRequestsPerRun").toInt(40);
     cfg.advanced.ytDlpPath = advancedObj.value("ytDlpPath").toString(QStringLiteral("yt-dlp"));
     cfg.advanced.debugOverlay = advancedObj.value("debugOverlay").toBool(false);
+    cfg.advanced.maxTrailerDurationSeconds = advancedObj.value("maxTrailerDurationSeconds").toInt(600);
 
     if (ok) *ok = true;
     return cfg;

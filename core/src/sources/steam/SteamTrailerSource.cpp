@@ -11,11 +11,11 @@ namespace ssv {
 
 SteamTrailerSource::SteamTrailerSource(QNetworkAccessManager& networkManager, CacheRepository& repo,
                                         QString language, QString countryCode, QString ytDlpPath,
-                                        qint64 candidateListTtlSeconds)
+                                        qint64 candidateListTtlSeconds, int maxTrailerDurationSeconds)
     : m_repo(repo)
     , m_detailsClient(networkManager, std::move(language), std::move(countryCode))
     , m_candidateFinder(networkManager)
-    , m_youtubeFallback(std::move(ytDlpPath))
+    , m_youtubeFallback(std::move(ytDlpPath), maxTrailerDurationSeconds)
     , m_candidateListTtlSeconds(candidateListTtlSeconds)
 {
     SteamAgeGate::apply(networkManager);

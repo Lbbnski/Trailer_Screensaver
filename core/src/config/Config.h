@@ -37,6 +37,13 @@ struct AdvancedConfig {
     int maxCatalogRequestsPerRun = 40;
     QString ytDlpPath = QStringLiteral("yt-dlp");
 
+    // Rejects YouTube-fallback search results longer than this — without
+    // it, a search can just as easily land on a Let's Play or full
+    // walkthrough as an actual trailer. 10 minutes comfortably covers even
+    // long cinematic reveal trailers while still excluding that kind of
+    // content.
+    int maxTrailerDurationSeconds = 600;
+
     // Shows a live tail of the app log on top of the video (see
     // qtui/src/DebugOverlay.h) — a troubleshooting aid, off by default so
     // normal use never shows it.

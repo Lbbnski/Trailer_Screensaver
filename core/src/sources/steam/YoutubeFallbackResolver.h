@@ -19,7 +19,8 @@ namespace ssv {
 // ytdl_hook re-resolve a fresh stream URL every time.
 class YoutubeFallbackResolver {
 public:
-    explicit YoutubeFallbackResolver(QString ytDlpPath = QStringLiteral("yt-dlp"));
+    // maxDurationSeconds <= 0 disables the length filter entirely.
+    explicit YoutubeFallbackResolver(QString ytDlpPath = QStringLiteral("yt-dlp"), int maxDurationSeconds = 600);
 
     // Searches for `gameTitle`'s official trailer, disambiguated with
     // `developer` when known (plenty of game titles collide with a movie,
@@ -27,7 +28,10 @@ public:
     // trailer" alone routinely picks up exactly that). Looks at several
     // search results rather than blindly trusting the top one, and only
     // accepts a result whose own video title actually resembles the game
-    // title. On success, returns a TrailerRendition wrapping the durable
+    // title and whose duration is within maxDurationSeconds — a search can
+    // just as easily land on a Let's Play or full walkthrough as an actual
+    // trailer, and those tend to run far longer than any real trailer. On
+    // success, returns a TrailerRendition wrapping the durable
     // watch URL (approxHeight is left at 0 — resolution capping for this
     // rendition happens via mpv's ytdl-format option at playback time, not
     // here) and fills outVideoId/outQueryUsed so the caller
@@ -45,6 +49,7 @@ public:
 
 private:
     QString m_ytDlpPath;
+    int m_maxDurationSeconds;
 };
 
 } // namespace ssv

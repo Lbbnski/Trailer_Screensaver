@@ -84,7 +84,8 @@ bool PlaybackSession::start(std::optional<Config> configOverride)
     m_registry.registerSource(std::make_unique<SteamTrailerSource>(
         *m_networkManager, *m_repo,
         m_config.sources.steamLanguage, m_config.sources.steamCountryCode, m_config.advanced.ytDlpPath,
-        qint64(m_config.advanced.cacheTtlDaysCandidateList) * 24 * 3600));
+        qint64(m_config.advanced.cacheTtlDaysCandidateList) * 24 * 3600,
+        m_config.advanced.maxTrailerDurationSeconds));
 
     m_resolver = std::make_unique<TrailerResolver>(m_registry, *m_repo, m_config.advanced);
     m_playlistEngine = std::make_unique<PlaylistEngine>(*m_repo);

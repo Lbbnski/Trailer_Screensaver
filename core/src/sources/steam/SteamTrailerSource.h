@@ -24,7 +24,7 @@ class SteamTrailerSource : public IMetadataSource {
 public:
     SteamTrailerSource(QNetworkAccessManager& networkManager, CacheRepository& repo,
                         QString language, QString countryCode, QString ytDlpPath,
-                        qint64 candidateListTtlSeconds);
+                        qint64 candidateListTtlSeconds, int maxTrailerDurationSeconds = 600);
 
     QString id() const override;
     QList<QString> discoverCandidates(const GenreFilter& filter, int requestBudget) override;
