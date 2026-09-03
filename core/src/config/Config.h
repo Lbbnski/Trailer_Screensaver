@@ -29,6 +29,14 @@ struct SourcesConfig {
     QStringList enabled{QStringLiteral("steam")};
     QString steamLanguage = QStringLiteral("english");
     QString steamCountryCode = QStringLiteral("US");
+
+    // A free Twitch developer app's credentials — required for "igdb" in
+    // `enabled` to actually contribute anything (see
+    // PlaybackSession::start()); both empty by default since this needs
+    // manual per-user setup, same as advanced.ytDlpPath needing yt-dlp
+    // installed separately.
+    QString igdbClientId;
+    QString igdbClientSecret;
 };
 
 struct AdvancedConfig {

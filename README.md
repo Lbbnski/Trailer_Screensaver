@@ -11,10 +11,14 @@ Linux.
   launch yourself: a genuine Windows `.scr` (works with Display Settings'
   screensaver picker, including the small preview thumbnail) and a classic
   X11 xscreensaver hack on Linux.
-- **Steam as the sole catalog.** Trailers are discovered and filtered using
-  Steam's own genre/age metadata. If a Steam game has no Steam-hosted
-  trailer, it falls back to a YouTube search for that specific game — but a
-  game with no Steam page at all is never included.
+- **Steam as the primary catalog**, with an optional **IGDB** source that
+  adds games regardless of storefront. Trailers are discovered and filtered
+  using each source's own genre/age metadata, normalized onto one shared
+  vocabulary. If a Steam game has no Steam-hosted trailer, it falls back to
+  a YouTube search for that specific game; IGDB games instead carry a
+  curated YouTube video id directly, so no search is needed for them at
+  all. IGDB is off by default — enabling it needs a free Twitch developer
+  app (see Settings below).
 - **Genre and age filtering**, allow-list or block-list, plus a "prefer
   popular / most-played games" option (backed by SteamSpy's top-played
   lists).
@@ -51,10 +55,14 @@ and [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for known constraints
 
 - [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) installed and either on
   `PATH` or pointed at via `advanced.ytDlpPath` in the config — required
-  for the YouTube-fallback path to work at all.
+  for the YouTube-fallback path (Steam's, and IGDB's rare no-video case) to
+  work at all.
 - Windows 10/11, or Linux with a running X11 session and `xscreensaver`
   installed (X11 via XWayland works; native Wayland/GNOME sessions have no
   screensaver-hosting mechanism to integrate with at all).
+- Optional, to enable the IGDB source: a free Twitch developer app —
+  create one at [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps)
+  and enter its Client ID and Secret in Settings.
 
 ## Building from source
 
@@ -98,9 +106,10 @@ platform), `SSV_STATIC_QT` (default off).
 One settings dialog is shared across all three entry points (Windows `/c`,
 the Linux hack's `--configure`, and the standalone `settings-gui`):
 resolution cap, multi-monitor mode, mute/hardware-decode toggles, genre
-allow/block-list, maximum age rating, "prefer popular games", and a debug
-log overlay toggle (off by default — shows a live tail of the app's log on
-top of the video, for troubleshooting).
+allow/block-list, maximum age rating, "prefer popular games", a debug log
+overlay toggle (off by default — shows a live tail of the app's log on top
+of the video, for troubleshooting), and the IGDB source toggle with its
+Twitch Client ID/Secret fields.
 
 A few settings are config-file-only for now (no UI control yet): trailer
 length cap (`advanced.maxTrailerDurationSeconds`, default 600s), cache TTLs,

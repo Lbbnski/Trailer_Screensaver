@@ -17,6 +17,7 @@ class QNetworkAccessManager;
 namespace ssv {
 
 class MpvGLWidget;
+class YoutubeFallbackResolver;
 
 // The data-and-playback pipeline shared by both OS integrations: loads
 // config, opens the cache, registers the enabled IMetadataSource
@@ -89,6 +90,7 @@ private:
     std::unique_ptr<CacheRepository> m_repo;
     QNetworkAccessManager* m_networkManager = nullptr;
     SourceRegistry m_registry;
+    std::unique_ptr<YoutubeFallbackResolver> m_youtubeFallback;
     std::unique_ptr<TrailerResolver> m_resolver;
     std::unique_ptr<PlaylistEngine> m_playlistEngine;
 

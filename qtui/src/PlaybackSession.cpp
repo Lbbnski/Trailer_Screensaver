@@ -2,7 +2,9 @@
 
 #include "MpvGLWidget.h"
 #include "config/ConfigPaths.h"
+#include "sources/igdb/IgdbTrailerSource.h"
 #include "sources/steam/SteamTrailerSource.h"
+#include "sources/steam/YoutubeFallbackResolver.h"
 #include "util/Logging.h"
 
 #include <QDateTime>
@@ -81,11 +83,35 @@ bool PlaybackSession::start(std::optional<Config> configOverride)
     // list) completed instantly. This app has no need for proxy support
     // sophistication, so just skip system proxy resolution entirely.
     m_networkManager->setProxy(QNetworkProxy::NoProxy);
+
+    // Shared by every registered source that needs a YouTube-search
+    // fallback (Steam always; IGDB only for the rare candidate with no
+    // curated video of its own) — one resolver, one yt-dlp path/duration
+    // cap/title-matching implementation, regardless of how many sources
+    // are enabled.
+    m_youtubeFallback = std::make_unique<YoutubeFallbackResolver>(
+        m_config.advanced.ytDlpPath, m_config.advanced.maxTrailerDurationSeconds);
+
+    const qint64 candidateListTtlSeconds = qint64(m_config.advanced.cacheTtlDaysCandidateList) * 24 * 3600;
+
     m_registry.registerSource(std::make_unique<SteamTrailerSource>(
         *m_networkManager, *m_repo,
-        m_config.sources.steamLanguage, m_config.sources.steamCountryCode, m_config.advanced.ytDlpPath,
-        qint64(m_config.advanced.cacheTtlDaysCandidateList) * 24 * 3600,
-        m_config.advanced.maxTrailerDurationSeconds));
+        m_config.sources.steamLanguage, m_config.sources.steamCountryCode,
+        *m_youtubeFallback, candidateListTtlSeconds));
+
+    // IGDB requires a free Twitch developer Client ID/Secret the user
+    // configures themselves in Settings — listing "igdb" in sources.enabled
+    // with either left blank degrades to "registered, but contributes
+    // nothing" rather than failing, same as every other missing-config path
+    // in this codebase.
+    if (!m_config.sources.igdbClientId.isEmpty() && !m_config.sources.igdbClientSecret.isEmpty()) {
+        m_registry.registerSource(std::make_unique<IgdbTrailerSource>(
+            *m_networkManager, *m_repo,
+            m_config.sources.igdbClientId, m_config.sources.igdbClientSecret,
+            *m_youtubeFallback, candidateListTtlSeconds));
+    } else if (m_config.sources.enabled.contains(QStringLiteral("igdb"), Qt::CaseInsensitive)) {
+        logInfo(QStringLiteral("igdb listed in sources.enabled but no client id/secret configured — skipping"));
+    }
 
     m_resolver = std::make_unique<TrailerResolver>(m_registry, *m_repo, m_config.advanced);
     m_playlistEngine = std::make_unique<PlaylistEngine>(*m_repo);

@@ -12,6 +12,14 @@ add_executable(test_CacheRepository test_CacheRepository.cpp)
 target_link_libraries(test_CacheRepository PRIVATE ssvcore Qt6::Test)
 add_test(NAME CacheRepository COMMAND test_CacheRepository)
 
+add_executable(test_IgdbGenreMap test_IgdbGenreMap.cpp)
+target_link_libraries(test_IgdbGenreMap PRIVATE ssvcore Qt6::Test)
+add_test(NAME IgdbGenreMap COMMAND test_IgdbGenreMap)
+
+add_executable(test_IgdbAgeRatingMap test_IgdbAgeRatingMap.cpp)
+target_link_libraries(test_IgdbAgeRatingMap PRIVATE ssvcore Qt6::Test)
+add_test(NAME IgdbAgeRatingMap COMMAND test_IgdbAgeRatingMap)
+
 # The QSQLITE driver used by CacheDatabase is a Qt plugin, not linked into
 # the binary — it's only found via QT_PLUGIN_PATH (or sitting next to the
 # executable, which windeployqt handles for the shipped apps but nothing

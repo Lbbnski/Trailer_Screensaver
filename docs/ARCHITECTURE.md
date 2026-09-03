@@ -10,9 +10,10 @@ plan; it exists to orient a new contributor in the actual source tree.
 
 - `core/` (`ssvcore`, static lib, no GUI dependency) — config, the
   pluggable metadata-source abstraction (`sources/IMetadataSource.h`),
-  the Steam source implementation (`sources/steam/`), the SQLite cache,
-  the source-agnostic `TrailerResolver`, `PlaylistEngine` filtering, and
-  the libmpv playback wrapper (`playback/MpvPlayer` + `MpvGlRenderer`).
+  the Steam (`sources/steam/`) and IGDB (`sources/igdb/`) source
+  implementations, the SQLite cache, the source-agnostic
+  `TrailerResolver`, `PlaylistEngine` filtering, and the libmpv playback
+  wrapper (`playback/MpvPlayer` + `MpvGlRenderer`).
 - `qtui/` (`ssvsettingsui`, static lib, Qt Widgets) — `MpvGLWidget` (the
   libmpv/Qt-GL integration point), `EmbeddedForeignWindow` (foreign-window
   embedding shared by Windows preview and the Linux hack),
@@ -35,21 +36,36 @@ plan; it exists to orient a new contributor in the actual source tree.
 
 ## Extensibility: adding a metadata source
 
-Steam is the only registered `IMetadataSource` today, but the interface
-(`core/src/sources/IMetadataSource.h`) is source-agnostic by design.
-Adding a second source means:
+The interface (`core/src/sources/IMetadataSource.h`) is source-agnostic by
+design, and IGDB (`sources/igdb/`) is a second real implementation
+alongside Steam (`sources/steam/`) proving it out — adding a source means:
 
 1. Implement `IMetadataSource` (see `sources/steam/SteamTrailerSource.h`
-   for the reference implementation).
-2. Extend `sources/GenreTaxonomy.cpp` if the new source's vocabulary needs
-   more canonical genres than Steam's already cover.
-3. Register an instance in `PlaybackSession::start()` (currently the only
-   place that constructs `SteamTrailerSource`) and add its id to
-   `Config::sources.enabled`.
+   or `sources/igdb/IgdbTrailerSource.h`).
+2. Add a genre-mapping table translating the new source's own vocabulary
+   onto `GenreTaxonomy`'s canonical list (`sources/steam/SteamGenreMap.*`,
+   `sources/igdb/IgdbGenreMap.*`) — extend `GenreTaxonomy::canonicalGenres()`
+   itself only if the new source needs a genre neither existing source has
+   any equivalent for.
+3. Register an instance in `PlaybackSession::start()` and add its id to
+   `Config::sources.enabled`. If the source needs its own credentials
+   (IGDB's Twitch Client ID/Secret) or config, add fields to
+   `SourcesConfig` and register conditionally — see how IGDB is skipped
+   with a log line, not a hard failure, when unconfigured.
 
 Nothing in the cache, `TrailerResolver`, `PlaylistEngine`, or either OS
 integration layer needs to change — every cache table is already keyed (or
-scoped) by `source_id` for exactly this reason.
+scoped) by `source_id` for exactly this reason. IGDB's addition needed zero
+changes to any of those files, only new files under `sources/igdb/` plus
+the `PlaybackSession`/`Config`/`SettingsDialog` wiring described above.
+
+IGDB also illustrates a source that never needs `resolveFallback()` for
+most candidates: every `Game.videos[]` entry it returns is already a
+curated YouTube video id (`GameVideo.video_id`), so `IgdbTrailerSource`
+only calls into the shared `YoutubeFallbackResolver` (owned by
+`PlaybackSession`, passed by reference to both sources) for the rare
+candidate with no videos of its own — unlike Steam, which needs it for
+every app with no Steam-hosted trailer.
 
 ## Build
 

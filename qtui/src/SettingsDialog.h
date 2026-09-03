@@ -10,6 +10,7 @@ class QSpinBox;
 class QSlider;
 class QListView;
 class QRadioButton;
+class QLineEdit;
 
 namespace ssv {
 
@@ -51,7 +52,11 @@ private:
     QSpinBox* m_maxAgeSpin = nullptr;
     QCheckBox* m_preferPopularCheck = nullptr;
 
-    QCheckBox* m_steamSourceCheck = nullptr; // the only source today; future sources add siblings here
+    QCheckBox* m_steamSourceCheck = nullptr; // always enabled; kept as a checkbox for symmetry with future sources
+
+    QCheckBox* m_igdbSourceCheck = nullptr;
+    QLineEdit* m_igdbClientIdEdit = nullptr;
+    QLineEdit* m_igdbClientSecretEdit = nullptr;
 };
 
 } // namespace ssv

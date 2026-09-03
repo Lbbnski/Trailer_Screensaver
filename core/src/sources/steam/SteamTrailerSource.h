@@ -22,9 +22,15 @@ namespace ssv {
 // every table is scoped by source_id.
 class SteamTrailerSource : public IMetadataSource {
 public:
+    // youtubeFallback is owned by the caller (PlaybackSession) and shared
+    // with any other registered source that also needs a YouTube-search
+    // fallback (e.g. IgdbTrailerSource, for the rare IGDB candidate with no
+    // curated video of its own) — one resolver instance per process is all
+    // either source needs.
     SteamTrailerSource(QNetworkAccessManager& networkManager, CacheRepository& repo,
-                        QString language, QString countryCode, QString ytDlpPath,
-                        qint64 candidateListTtlSeconds, int maxTrailerDurationSeconds = 600);
+                        QString language, QString countryCode,
+                        YoutubeFallbackResolver& youtubeFallback,
+                        qint64 candidateListTtlSeconds);
 
     QString id() const override;
     QList<QString> discoverCandidates(const GenreFilter& filter, int requestBudget) override;
@@ -35,7 +41,7 @@ private:
     CacheRepository& m_repo;
     SteamAppDetailsClient m_detailsClient;
     SteamGenreCandidateFinder m_candidateFinder;
-    YoutubeFallbackResolver m_youtubeFallback;
+    YoutubeFallbackResolver& m_youtubeFallback;
     qint64 m_candidateListTtlSeconds;
 };
 

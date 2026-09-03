@@ -48,5 +48,20 @@
   cross-reference.** The fallback path only ever triggers for a game that
   *does* have a Steam page (just no Steam-hosted trailer) — its genre/age
   filtering still comes from Steam's own metadata for that app, so this is
-  a minor accuracy note rather than a real gap: games with no Steam page at
-  all are excluded from the catalog entirely, by design.
+  a minor accuracy note rather than a real gap. (Games with no Steam page
+  at all are still excluded from the *Steam* source specifically — but see
+  IGDB below, which covers exactly that gap.)
+
+- **IGDB's free tier is rate-limited, though exact numbers aren't
+  published**, and its schema has already migrated the age-rating
+  representation from an inline numeric enum to a reference-table string
+  once (`AgeRating.rating` → `AgeRating.rating_category.rating`). Both
+  `IgdbAgeRatingMap` and `IgdbGenreMap` treat any label they don't
+  recognize as "no known value" rather than crashing or wrongly excluding
+  a game, so a future IGDB schema change degrades filtering accuracy for
+  the affected label rather than breaking the source outright — a
+  `logWarning` line names the specific unrecognized label so the mapping
+  table can be updated once observed. IGDB also requires a free Twitch
+  developer app (Client ID + Secret, configured in Settings); until those
+  are set, `sources.enabled` can list `"igdb"` with no effect other than an
+  informational log line — Steam alone still works exactly as before.

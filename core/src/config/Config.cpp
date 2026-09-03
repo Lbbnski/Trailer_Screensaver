@@ -82,9 +82,14 @@ QByteArray Config::toJson() const
         {"language", sources.steamLanguage},
         {"countryCode", sources.steamCountryCode},
     };
+    QJsonObject igdbObj{
+        {"clientId", sources.igdbClientId},
+        {"clientSecret", sources.igdbClientSecret},
+    };
     QJsonObject sourcesObj{
         {"enabled", toJsonArray(sources.enabled)},
         {"steam", steamObj},
+        {"igdb", igdbObj},
     };
 
     QJsonObject advancedObj{
@@ -140,6 +145,9 @@ Config Config::fromJson(const QByteArray& json, bool* ok)
     const auto steamObj = sourcesObj.value("steam").toObject();
     cfg.sources.steamLanguage = steamObj.value("language").toString(QStringLiteral("english"));
     cfg.sources.steamCountryCode = steamObj.value("countryCode").toString(QStringLiteral("US"));
+    const auto igdbObj = sourcesObj.value("igdb").toObject();
+    cfg.sources.igdbClientId = igdbObj.value("clientId").toString();
+    cfg.sources.igdbClientSecret = igdbObj.value("clientSecret").toString();
 
     const auto advancedObj = root.value("advanced").toObject();
     cfg.advanced.cacheTtlDaysAppDetails = advancedObj.value("cacheTtlDaysAppDetails").toInt(21);

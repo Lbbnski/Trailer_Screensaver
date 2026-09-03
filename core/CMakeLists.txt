@@ -24,6 +24,19 @@ add_library(ssvcore STATIC
   src/sources/steam/SteamTrailerSource.h
   src/sources/steam/SteamTrailerSource.cpp
 
+  src/sources/igdb/IgdbAuthClient.h
+  src/sources/igdb/IgdbAuthClient.cpp
+  src/sources/igdb/IgdbClient.h
+  src/sources/igdb/IgdbClient.cpp
+  src/sources/igdb/IgdbGenreMap.h
+  src/sources/igdb/IgdbGenreMap.cpp
+  src/sources/igdb/IgdbAgeRatingMap.h
+  src/sources/igdb/IgdbAgeRatingMap.cpp
+  src/sources/igdb/IgdbCandidateFinder.h
+  src/sources/igdb/IgdbCandidateFinder.cpp
+  src/sources/igdb/IgdbTrailerSource.h
+  src/sources/igdb/IgdbTrailerSource.cpp
+
   src/cache/CacheDatabase.h
   src/cache/CacheDatabase.cpp
   src/cache/CacheRepository.h

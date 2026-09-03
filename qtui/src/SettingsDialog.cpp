@@ -8,6 +8,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QListView>
 #include <QMessageBox>
 #include <QRadioButton>
@@ -88,15 +89,31 @@ void SettingsDialog::buildUi()
     root->addWidget(filterBox);
 
     // --- Sources ---
-    // Only Steam exists today; this box is deliberately structured as a
-    // checkable list so a future second IMetadataSource implementation adds
-    // one more checkbox here rather than needing new UI.
     auto* sourcesBox = new QGroupBox(tr("Trailer Sources"), this);
     auto* sourcesLayout = new QVBoxLayout(sourcesBox);
     m_steamSourceCheck = new QCheckBox(tr("Steam (with YouTube fallback for games with no Steam trailer)"), sourcesBox);
     m_steamSourceCheck->setChecked(true);
-    m_steamSourceCheck->setEnabled(false); // only source available right now
+    m_steamSourceCheck->setEnabled(false); // always on — the app has no other way to discover games yet
     sourcesLayout->addWidget(m_steamSourceCheck);
+
+    m_igdbSourceCheck = new QCheckBox(tr("IGDB (adds games beyond Steam's catalog; curated YouTube trailers)"), sourcesBox);
+    sourcesLayout->addWidget(m_igdbSourceCheck);
+
+    auto* igdbForm = new QFormLayout();
+    m_igdbClientIdEdit = new QLineEdit(sourcesBox);
+    igdbForm->addRow(tr("Twitch Client ID:"), m_igdbClientIdEdit);
+    m_igdbClientSecretEdit = new QLineEdit(sourcesBox);
+    m_igdbClientSecretEdit->setEchoMode(QLineEdit::Password);
+    igdbForm->addRow(tr("Twitch Client Secret:"), m_igdbClientSecretEdit);
+    sourcesLayout->addLayout(igdbForm);
+
+    auto* igdbHint = new QLabel(
+        tr("IGDB requires a free Twitch developer app — create one at dev.twitch.tv/console/apps "
+           "and paste its Client ID and Secret above."),
+        sourcesBox);
+    igdbHint->setWordWrap(true);
+    sourcesLayout->addWidget(igdbHint);
+
     root->addWidget(sourcesBox);
 
     // --- Buttons ---
@@ -130,6 +147,10 @@ void SettingsDialog::loadConfig()
     m_maxAgeSpin->setValue(cfg.filter.maxAge);
 
     m_preferPopularCheck->setChecked(cfg.filter.preferPopular);
+
+    m_igdbSourceCheck->setChecked(cfg.sources.enabled.contains(QStringLiteral("igdb"), Qt::CaseInsensitive));
+    m_igdbClientIdEdit->setText(cfg.sources.igdbClientId);
+    m_igdbClientSecretEdit->setText(cfg.sources.igdbClientSecret);
 }
 
 Config SettingsDialog::collectConfig() const
@@ -148,6 +169,12 @@ Config SettingsDialog::collectConfig() const
     cfg.filter.genres = m_genreModel->checkedGenres();
     cfg.filter.maxAge = m_maxAgeSpin->value();
     cfg.filter.preferPopular = m_preferPopularCheck->isChecked();
+
+    cfg.sources.enabled.removeAll(QStringLiteral("igdb"));
+    if (m_igdbSourceCheck->isChecked())
+        cfg.sources.enabled << QStringLiteral("igdb");
+    cfg.sources.igdbClientId = m_igdbClientIdEdit->text().trimmed();
+    cfg.sources.igdbClientSecret = m_igdbClientSecretEdit->text();
 
     return cfg;
 }
