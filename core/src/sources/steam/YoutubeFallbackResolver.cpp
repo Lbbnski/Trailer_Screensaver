@@ -2,9 +2,11 @@
 #include "util/Logging.h"
 #include "util/ProcessRunner.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QSet>
 
 #include <algorithm>
 
@@ -16,6 +18,51 @@ namespace {
 // that actually looks like the game — one subprocess call regardless, so
 // this costs nothing extra beyond a slightly larger response to parse.
 constexpr int kResultsToConsider = 5;
+
+// YouTube's own topic category for a video — not present in flat-playlist
+// search results at all (confirmed empirically: the "categories"/"tags"
+// fields are simply empty there), only via a full per-video extraction.
+// These two are the categories a real movie/film trailer with a
+// same-named game reliably lands in — observed directly against a search
+// that mixed both ("Alone in the Dark" returns both the 2005 film's
+// trailer, categorized "Film & Animation", and the actual game's reveal
+// trailer, categorized "Gaming", for the same query). Deliberately a small
+// blocklist rather than an allow-list of "Gaming" only: real game trailers
+// are sometimes categorized "Entertainment" or others by their uploader,
+// and rejecting anything not exactly "Gaming" would throw those out too.
+const QSet<QString>& blockedYoutubeCategories()
+{
+    static const QSet<QString> categories{
+        QStringLiteral("Film & Animation"),
+        QStringLiteral("Movies"),
+    };
+    return categories;
+}
+
+// One extra (full, non-flat) yt-dlp invocation per candidate that already
+// passed the cheap title/duration checks — only run for a result that
+// would otherwise be accepted, so this costs nothing for candidates
+// already rejected on title or length. A fetch failure (network hiccup,
+// video removed between the search and this call) returns an empty list,
+// which is treated as "unknown, don't block" by the caller — the same
+// "never over-filter on missing data" behavior every other source's
+// mapping table uses for a value it doesn't recognize.
+QStringList fetchYoutubeCategories(const QString& ytDlpPath, const QString& videoId)
+{
+    const QStringList args{
+        "--dump-json",
+        "--no-warnings",
+        QStringLiteral("https://www.youtube.com/watch?v=%1").arg(videoId),
+    };
+    const auto result = ProcessRunner::run(ytDlpPath, args);
+    if (!result.ok())
+        return {};
+
+    QStringList categories;
+    for (const auto& c : QJsonDocument::fromJson(result.stdOut).object().value("categories").toArray())
+        categories << c.toString();
+    return categories;
+}
 
 // True if at least half of the game title's non-trivial words show up in
 // the video's own title. Deliberately not an exact/full-title substring
@@ -123,6 +170,21 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         if (m_maxDurationSeconds > 0 && durationValue.isDouble() && durationValue.toInt() > m_maxDurationSeconds) {
             logInfo(QStringLiteral("yt-dlp: \"%1\" is %2s, over the %3s cap — skipping (likely a Let's Play/walkthrough, not a trailer)")
                         .arg(title).arg(durationValue.toInt()).arg(m_maxDurationSeconds));
+            continue;
+        }
+
+        const auto categories = fetchYoutubeCategories(m_ytDlpPath, id);
+        bool isBlockedCategory = false;
+        for (const auto& c : categories) {
+            if (blockedYoutubeCategories().contains(c)) {
+                isBlockedCategory = true;
+                break;
+            }
+        }
+        if (isBlockedCategory) {
+            logInfo(QStringLiteral("yt-dlp: \"%1\" is categorized \"%2\" on YouTube — skipping "
+                                    "(looks like non-game content, e.g. a movie trailer sharing the game's title)")
+                        .arg(title, categories.join(QStringLiteral(", "))));
             continue;
         }
 

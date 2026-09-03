@@ -28,10 +28,14 @@ public:
     // trailer" alone routinely picks up exactly that). Looks at several
     // search results rather than blindly trusting the top one, and only
     // accepts a result whose own video title actually resembles the game
-    // title and whose duration is within maxDurationSeconds — a search can
-    // just as easily land on a Let's Play or full walkthrough as an actual
-    // trailer, and those tend to run far longer than any real trailer. On
-    // success, returns a TrailerRendition wrapping the durable
+    // title, whose duration is within maxDurationSeconds, and whose
+    // YouTube category isn't one that means "this is a movie/film trailer,
+    // not a game trailer" (checked via one extra full-detail yt-dlp fetch
+    // per otherwise-acceptable candidate — categories aren't present in
+    // the fast flat-playlist search results at all) — a search can just as
+    // easily land on a Let's Play, a full walkthrough, or a same-named
+    // movie's trailer as the actual game trailer. On success, returns a
+    // TrailerRendition wrapping the durable
     // watch URL (approxHeight is left at 0 — resolution capping for this
     // rendition happens via mpv's ytdl-format option at playback time, not
     // here) and fills outVideoId/outQueryUsed so the caller
