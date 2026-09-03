@@ -10,10 +10,10 @@ plan; it exists to orient a new contributor in the actual source tree.
 
 - `core/` (`ssvcore`, static lib, no GUI dependency) — config, the
   pluggable metadata-source abstraction (`sources/IMetadataSource.h`),
-  the Steam (`sources/steam/`) and IGDB (`sources/igdb/`) source
-  implementations, the SQLite cache, the source-agnostic
-  `TrailerResolver`, `PlaylistEngine` filtering, and the libmpv playback
-  wrapper (`playback/MpvPlayer` + `MpvGlRenderer`).
+  the Steam (`sources/steam/`), IGDB (`sources/igdb/`), and GOG
+  (`sources/gog/`) source implementations, the SQLite cache, the
+  source-agnostic `TrailerResolver`, `PlaylistEngine` filtering, and the
+  libmpv playback wrapper (`playback/MpvPlayer` + `MpvGlRenderer`).
 - `qtui/` (`ssvsettingsui`, static lib, Qt Widgets) — `MpvGLWidget` (the
   libmpv/Qt-GL integration point), `EmbeddedForeignWindow` (foreign-window
   embedding shared by Windows preview and the Linux hack),
@@ -63,9 +63,24 @@ IGDB also illustrates a source that never needs `resolveFallback()` for
 most candidates: every `Game.videos[]` entry it returns is already a
 curated YouTube video id (`GameVideo.video_id`), so `IgdbTrailerSource`
 only calls into the shared `YoutubeFallbackResolver` (owned by
-`PlaybackSession`, passed by reference to both sources) for the rare
-candidate with no videos of its own — unlike Steam, which needs it for
-every app with no Steam-hosted trailer.
+`PlaybackSession`, passed by reference to every source that needs it) for
+the rare candidate with no videos of its own — unlike Steam, which needs
+it for every app with no Steam-hosted trailer.
+
+GOG (`sources/gog/`) illustrates a source whose API shape doesn't map
+cleanly onto the "cheap id list from discoverCandidates(), full details
+from one fetchDetails() call" model the interface implies: GOG's listing
+endpoint gives genres/developer/age for free during discovery, but
+trailers only come from a *separate* per-id call that repeats none of that
+metadata. `GogCandidateFinder` bridges this with an in-memory
+(not persisted) map from native id to the metadata discovery already
+found, which `GogTrailerSource::fetchDetails()` reads before making its
+own one video-only request — safe specifically because
+`TrailerResolver::preparePool()` always calls `fetchDetails()` for a
+newly-discovered id within the same call that discovered it. A future
+source with an even more different shape doesn't have to reuse this exact
+trick, but it's a working example of adapting an odd API to the interface
+without changing the interface itself.
 
 ## Build
 

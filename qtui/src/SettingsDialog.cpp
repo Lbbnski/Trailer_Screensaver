@@ -114,6 +114,9 @@ void SettingsDialog::buildUi()
     igdbHint->setWordWrap(true);
     sourcesLayout->addWidget(igdbHint);
 
+    m_gogSourceCheck = new QCheckBox(tr("GOG (no account or setup needed)"), sourcesBox);
+    sourcesLayout->addWidget(m_gogSourceCheck);
+
     root->addWidget(sourcesBox);
 
     // --- Buttons ---
@@ -151,6 +154,8 @@ void SettingsDialog::loadConfig()
     m_igdbSourceCheck->setChecked(cfg.sources.enabled.contains(QStringLiteral("igdb"), Qt::CaseInsensitive));
     m_igdbClientIdEdit->setText(cfg.sources.igdbClientId);
     m_igdbClientSecretEdit->setText(cfg.sources.igdbClientSecret);
+
+    m_gogSourceCheck->setChecked(cfg.sources.enabled.contains(QStringLiteral("gog"), Qt::CaseInsensitive));
 }
 
 Config SettingsDialog::collectConfig() const
@@ -175,6 +180,10 @@ Config SettingsDialog::collectConfig() const
         cfg.sources.enabled << QStringLiteral("igdb");
     cfg.sources.igdbClientId = m_igdbClientIdEdit->text().trimmed();
     cfg.sources.igdbClientSecret = m_igdbClientSecretEdit->text();
+
+    cfg.sources.enabled.removeAll(QStringLiteral("gog"));
+    if (m_gogSourceCheck->isChecked())
+        cfg.sources.enabled << QStringLiteral("gog");
 
     return cfg;
 }

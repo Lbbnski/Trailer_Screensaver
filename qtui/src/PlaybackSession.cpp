@@ -2,6 +2,7 @@
 
 #include "MpvGLWidget.h"
 #include "config/ConfigPaths.h"
+#include "sources/gog/GogTrailerSource.h"
 #include "sources/igdb/IgdbTrailerSource.h"
 #include "sources/steam/SteamTrailerSource.h"
 #include "sources/steam/YoutubeFallbackResolver.h"
@@ -98,6 +99,13 @@ bool PlaybackSession::start(std::optional<Config> configOverride)
         *m_networkManager, *m_repo,
         m_config.sources.steamLanguage, m_config.sources.steamCountryCode,
         *m_youtubeFallback, candidateListTtlSeconds));
+
+    // GOG's storefront API needs no credentials, so — like Steam — it's
+    // always registered; whether it actually contributes anything is
+    // controlled purely by sources.enabled (see TrailerResolver::preparePool,
+    // which only iterates the enabled ids), same pattern as Steam.
+    m_registry.registerSource(std::make_unique<GogTrailerSource>(
+        *m_networkManager, *m_repo, *m_youtubeFallback, candidateListTtlSeconds));
 
     // IGDB requires a free Twitch developer Client ID/Secret the user
     // configures themselves in Settings — listing "igdb" in sources.enabled

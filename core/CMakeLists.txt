@@ -37,6 +37,13 @@ add_library(ssvcore STATIC
   src/sources/igdb/IgdbTrailerSource.h
   src/sources/igdb/IgdbTrailerSource.cpp
 
+  src/sources/gog/GogGenreMap.h
+  src/sources/gog/GogGenreMap.cpp
+  src/sources/gog/GogCandidateFinder.h
+  src/sources/gog/GogCandidateFinder.cpp
+  src/sources/gog/GogTrailerSource.h
+  src/sources/gog/GogTrailerSource.cpp
+
   src/cache/CacheDatabase.h
   src/cache/CacheDatabase.cpp
   src/cache/CacheRepository.h

@@ -65,3 +65,23 @@
   developer app (Client ID + Secret, configured in Settings); until those
   are set, `sources.enabled` can list `"igdb"` with no effect other than an
   informational log line — Steam alone still works exactly as before.
+
+- **GOG's API is unofficial and undocumented** (no published SLA, same
+  category of risk as Steam's own storefront endpoints) — `embed.gog.com`
+  and `api.gog.com` are community-reverse-engineered, not published by
+  GOG/CDPR. No credentials are needed and no confirmed rate limit was
+  found, but the exact accepted values for the listing endpoint's `sort`
+  and `category` parameters were inferred by analogy with GOG's own
+  storefront UI rather than confirmed against official documentation — an
+  unrecognized value is expected to degrade to GOG's default ordering
+  rather than error, so worst case is a less-ideal discovery order, not a
+  failure.
+- **GOG trailers hosted on Wistia (rather than YouTube) are not resolved.**
+  GOG's product-video field reports a `provider` per video; only
+  `provider == "youtube"` entries are played directly. Wistia's own
+  asset-resolution endpoint was found to be unreliable even for real
+  trailers during this integration's design research, so Wistia-hosted
+  trailers instead fall through to the same YouTube-search fallback every
+  source shares — meaning some GOG games will look, from a filtering
+  standpoint, like they had no trailer at all until that fallback resolves
+  one.

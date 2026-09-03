@@ -11,14 +11,16 @@ Linux.
   launch yourself: a genuine Windows `.scr` (works with Display Settings'
   screensaver picker, including the small preview thumbnail) and a classic
   X11 xscreensaver hack on Linux.
-- **Steam as the primary catalog**, with an optional **IGDB** source that
-  adds games regardless of storefront. Trailers are discovered and filtered
-  using each source's own genre/age metadata, normalized onto one shared
-  vocabulary. If a Steam game has no Steam-hosted trailer, it falls back to
-  a YouTube search for that specific game; IGDB games instead carry a
-  curated YouTube video id directly, so no search is needed for them at
-  all. IGDB is off by default — enabling it needs a free Twitch developer
-  app (see Settings below).
+- **Steam as the primary catalog**, with optional **IGDB** and **GOG**
+  sources that add games regardless of storefront. Trailers are discovered
+  and filtered using each source's own genre/age metadata, normalized onto
+  one shared vocabulary. If a Steam game has no Steam-hosted trailer, it
+  falls back to a YouTube search for that specific game; IGDB games instead
+  carry a curated YouTube video id directly, so no search is needed for
+  them at all; GOG games carry their own trailer field too (YouTube-hosted
+  ones play directly, others fall back the same way Steam's do). Both extra
+  sources are off by default — IGDB needs a free Twitch developer app, GOG
+  needs no setup at all (see Settings below).
 - **Genre and age filtering**, allow-list or block-list, plus a "prefer
   popular / most-played games" option (backed by SteamSpy's top-played
   lists).
@@ -108,8 +110,8 @@ the Linux hack's `--configure`, and the standalone `settings-gui`):
 resolution cap, multi-monitor mode, mute/hardware-decode toggles, genre
 allow/block-list, maximum age rating, "prefer popular games", a debug log
 overlay toggle (off by default — shows a live tail of the app's log on top
-of the video, for troubleshooting), and the IGDB source toggle with its
-Twitch Client ID/Secret fields.
+of the video, for troubleshooting), the IGDB source toggle with its Twitch
+Client ID/Secret fields, and a GOG source toggle (no fields needed).
 
 A few settings are config-file-only for now (no UI control yet): trailer
 length cap (`advanced.maxTrailerDurationSeconds`, default 600s), cache TTLs,

@@ -57,6 +57,8 @@ private:
     QCheckBox* m_igdbSourceCheck = nullptr;
     QLineEdit* m_igdbClientIdEdit = nullptr;
     QLineEdit* m_igdbClientSecretEdit = nullptr;
+
+    QCheckBox* m_gogSourceCheck = nullptr; // no credentials needed — GOG's storefront API is fully public
 };
 
 } // namespace ssv
