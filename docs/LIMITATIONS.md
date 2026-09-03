@@ -85,3 +85,20 @@
   source shares — meaning some GOG games will look, from a filtering
   standpoint, like they had no trailer at all until that fallback resolves
   one.
+
+- **Epic Games Store was evaluated and deliberately not implemented.**
+  Epic's storefront GraphQL endpoint (`store.epicgames.com/graphql`)
+  returned `403 Forbidden` to plain HTTP requests from two independent
+  clients (`curl`, PowerShell's `Invoke-WebRequest`) even with realistic
+  browser headers, consistent with Cloudflare bot/TLS-fingerprint
+  protection — the same category of block a Qt `QNetworkAccessManager`
+  request would very likely also hit, since neither replicates a real
+  browser's TLS handshake. Steam, IGDB, and GOG's endpoints were all
+  reachable the same way; Epic was the outlier. Separately, even Epic's
+  documented GraphQL schema doesn't clearly show which field connects a
+  catalog offer to its trailer video (`Media.getMediaRef`'s `mediaRefId` is
+  confirmed to exist but wasn't traceable back to a product query from
+  documentation/library source alone). Both problems would need to be
+  solved to add Epic as a real source; neither was pursued further since
+  the first one alone means a straightforward implementation likely
+  wouldn't function.
