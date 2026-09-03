@@ -25,6 +25,12 @@ const QHash<QString, QString>& toCanonicalTable()
         {"fighting", "Fighting"},
         {"shooter", "Shooter"},
         {"massively multiplayer", "Massively Multiplayer"},
+        {"sci-fi", "Sci-Fi"},
+        {"fantasy", "Fantasy"},
+        {"survival", "Survival"},
+        {"stealth", "Stealth"},
+        {"sandbox", "Sandbox"},
+        {"visual novel", "Visual Novel"},
     };
     return t;
 }
@@ -49,6 +55,16 @@ const QHash<QString, QString>& categoryParamTable()
         {"Fighting", "Fighting"},
         {"Shooter", "Shooter"},
         {"Massively Multiplayer", "Massively Multiplayer"},
+        // Confirmed present as a raw label in a real embed.gog.com
+        // response ("Sci-fi" appeared alongside "Simulation"/"Strategy" for
+        // a real product); the rest weren't individually confirmed the
+        // same way but follow the same casing convention.
+        {"Sci-Fi", "Sci-fi"},
+        {"Fantasy", "Fantasy"},
+        {"Survival", "Survival"},
+        {"Stealth", "Stealth"},
+        {"Sandbox", "Sandbox"},
+        {"Visual Novel", "Visual Novel"},
         // "Casual", "Free To Play", "Early Access" — Free To Play/Early
         // Access deliberately absent: GOG expresses "free" via the `price`
         // filter and "in development" via the `release` filter, neither of

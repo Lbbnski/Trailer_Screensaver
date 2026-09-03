@@ -176,6 +176,16 @@ QStringList SteamGenreCandidateFinder::discover(const QString& canonicalGenre, i
         if (!spyIds.isEmpty()) {
             repo.addGenreCandidates(sourceId, canonicalGenre, spyIds, now);
             discovered << spyIds;
+
+            // Only the tag-only path needs a hint: an official-genre-id
+            // discovery's candidates will already correctly carry that
+            // genre in Steam's own appdetails response, but a tag-only
+            // genre (Horror, Shooter, Sci-Fi, ...) structurally can't come
+            // back from that same field — see tagHintsFor()'s comment.
+            if (!officialGenreId) {
+                for (const auto& id : spyIds)
+                    m_tagHints[id] << canonicalGenre;
+            }
         }
         --requestBudget;
         state.lastRefreshedAt = now;
@@ -198,6 +208,11 @@ QStringList SteamGenreCandidateFinder::discover(const QString& canonicalGenre, i
     repo.setCandidatePageState(sourceId, canonicalGenre, state);
     discovered.removeDuplicates();
     return discovered;
+}
+
+QStringList SteamGenreCandidateFinder::tagHintsFor(const QString& nativeId) const
+{
+    return m_tagHints.value(nativeId);
 }
 
 } // namespace ssv

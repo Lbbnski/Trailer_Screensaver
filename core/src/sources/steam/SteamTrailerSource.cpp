@@ -80,7 +80,19 @@ QList<QString> SteamTrailerSource::discoverCandidates(const GenreFilter& filter,
 
 std::optional<TrailerCandidate> SteamTrailerSource::fetchDetails(const QString& nativeId)
 {
-    return m_detailsClient.fetchDetails(nativeId);
+    auto candidate = m_detailsClient.fetchDetails(nativeId);
+    if (!candidate)
+        return candidate;
+
+    // See SteamGenreCandidateFinder::tagHintsFor() — Steam's own genres
+    // field can't express a tag-only genre at all, so without this a
+    // candidate discovered specifically because it matched one (Horror,
+    // Sci-Fi, ...) would never actually carry that genre and would
+    // silently fail the very filter that found it.
+    candidate->canonicalGenres << m_candidateFinder.tagHintsFor(nativeId);
+    candidate->canonicalGenres.removeDuplicates();
+
+    return candidate;
 }
 
 std::optional<TrailerRendition> SteamTrailerSource::resolveFallback(const TrailerCandidate& candidate)

@@ -18,14 +18,17 @@ void TestGogGenreMap::mapsKnownLabels()
     QCOMPARE(GogGenreMap::toCanonical("Simulation"), QStringLiteral("Simulation"));
     QCOMPARE(GogGenreMap::toCanonical("rpg"), QStringLiteral("RPG"));
     QCOMPARE(GogGenreMap::toCanonical("  Strategy  "), QStringLiteral("Strategy"));
+    // Confirmed present in a real embed.gog.com response alongside actual
+    // genres, in this exact casing.
+    QCOMPARE(GogGenreMap::toCanonical("Sci-fi"), QStringLiteral("Sci-Fi"));
 }
 
 void TestGogGenreMap::passesThroughUnknownLabelsUnchanged()
 {
     // GOG mixes thematic tags into the same "genres" list; those have no
     // canonical equivalent and must pass through unchanged, not crash.
-    QCOMPARE(GogGenreMap::toCanonical("Sci-fi"), QStringLiteral("Sci-fi"));
-    QCOMPARE(GogGenreMap::toCanonical("Fantasy"), QStringLiteral("Fantasy"));
+    QCOMPARE(GogGenreMap::toCanonical("Historical"), QStringLiteral("Historical"));
+    QCOMPARE(GogGenreMap::toCanonical("Comedy"), QStringLiteral("Comedy"));
 }
 
 void TestGogGenreMap::categoryParamRoundTripsForEveryMappedGenre()

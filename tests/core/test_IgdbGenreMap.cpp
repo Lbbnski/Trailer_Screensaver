@@ -23,6 +23,10 @@ void TestIgdbGenreMap::mapsKnownGenreThemeAndGameModeLabels()
     QCOMPARE(IgdbGenreMap::toCanonical("Action"), QStringLiteral("Action"));
     // Game mode.
     QCOMPARE(IgdbGenreMap::toCanonical("Massively Multiplayer Online (MMO)"), QStringLiteral("Massively Multiplayer"));
+    // Theme (a second one, distinct from "Action"/"Horror" tested above).
+    QCOMPARE(IgdbGenreMap::toCanonical("Science Fiction"), QStringLiteral("Sci-Fi"));
+    // Genre that was previously deliberately left unmapped.
+    QCOMPARE(IgdbGenreMap::toCanonical("Visual Novel"), QStringLiteral("Visual Novel"));
     // Case-insensitive lookup, trimmed input.
     QCOMPARE(IgdbGenreMap::toCanonical("  shooter  "), QStringLiteral("Shooter"));
 }
@@ -30,8 +34,8 @@ void TestIgdbGenreMap::mapsKnownGenreThemeAndGameModeLabels()
 void TestIgdbGenreMap::passesThroughUnknownLabelsUnchanged()
 {
     // IGDB genres with no canonical equivalent — see header comment.
-    QCOMPARE(IgdbGenreMap::toCanonical("Visual Novel"), QStringLiteral("Visual Novel"));
     QCOMPARE(IgdbGenreMap::toCanonical("MOBA"), QStringLiteral("MOBA"));
+    QCOMPARE(IgdbGenreMap::toCanonical("Card & Board Game"), QStringLiteral("Card & Board Game"));
 }
 
 void TestIgdbGenreMap::apicalypseFilterCoversEveryMappedCanonicalGenre()

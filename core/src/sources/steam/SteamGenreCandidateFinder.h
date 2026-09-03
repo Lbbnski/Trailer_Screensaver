@@ -2,6 +2,7 @@
 
 #include "cache/CacheRepository.h"
 
+#include <QHash>
 #include <QString>
 #include <QStringList>
 
@@ -46,6 +47,19 @@ public:
     // than a bespoke cache table.
     QStringList topPlayed(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
+    // Canonical genres a native id was discovered under via the tag-only
+    // path (steamSpyByTag) during the most recent discover() call on this
+    // instance — empty if none. Steam's own appdetails `genres` field is
+    // limited to a small fixed set (Action, Adventure, RPG, Strategy, ...)
+    // that doesn't include tag-style genres at all: verified directly that
+    // Resident Evil Village's own `genres` is just `["Action"]` despite
+    // SteamSpy correctly tagging it "Horror". Without this, a candidate
+    // discovered specifically *because* it matched a tag-only genre would
+    // never actually carry that genre in its cached canonicalGenres, and
+    // silently fail the user's own filter for the genre that found it —
+    // SteamTrailerSource::fetchDetails() merges this in as a fix.
+    QStringList tagHintsFor(const QString& nativeId) const;
+
 private:
     QStringList searchStorePage(int genreId, int start, int count, bool* hasMore);
     QStringList steamSpyByGenre(const QString& canonicalGenre);
@@ -53,6 +67,7 @@ private:
     QStringList steamSpyTop(const QString& request);
 
     QNetworkAccessManager& m_networkManager;
+    QHash<QString, QStringList> m_tagHints;
 };
 
 } // namespace ssv

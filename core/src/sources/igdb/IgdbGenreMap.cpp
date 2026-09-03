@@ -42,6 +42,14 @@ const QHash<QString, QString>& table()
         {"horror", "Horror"},
         // Game.game_modes[].name
         {"massively multiplayer online (mmo)", "Massively Multiplayer"},
+        // Game.themes[].name
+        {"science fiction", "Sci-Fi"},
+        {"fantasy", "Fantasy"},
+        {"survival", "Survival"},
+        {"stealth", "Stealth"},
+        {"sandbox", "Sandbox"},
+        // Game.genres[].name
+        {"visual novel", "Visual Novel"},
     };
     return t;
 }
@@ -84,6 +92,12 @@ const QHash<QString, ReverseEntry>& reverseTable()
         {"Fighting", {"genres.name", {"Fighting"}}},
         {"Shooter", {"genres.name", {"Shooter"}}},
         {"Massively Multiplayer", {"game_modes.name", {"Massively Multiplayer Online (MMO)"}}},
+        {"Sci-Fi", {"themes.name", {"Science Fiction"}}},
+        {"Fantasy", {"themes.name", {"Fantasy"}}},
+        {"Survival", {"themes.name", {"Survival"}}},
+        {"Stealth", {"themes.name", {"Stealth"}}},
+        {"Sandbox", {"themes.name", {"Sandbox"}}},
+        {"Visual Novel", {"genres.name", {"Visual Novel"}}},
         // "Casual", "Free To Play", "Early Access" deliberately absent —
         // no IGDB equivalent, see header comment.
     };

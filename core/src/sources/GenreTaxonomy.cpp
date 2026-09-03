@@ -26,6 +26,12 @@ const QStringList& GenreTaxonomy::canonicalGenres()
         QStringLiteral("Massively Multiplayer"),
         QStringLiteral("Free To Play"),
         QStringLiteral("Early Access"),
+        QStringLiteral("Sci-Fi"),
+        QStringLiteral("Fantasy"),
+        QStringLiteral("Survival"),
+        QStringLiteral("Stealth"),
+        QStringLiteral("Sandbox"),
+        QStringLiteral("Visual Novel"),
     };
     return genres;
 }
