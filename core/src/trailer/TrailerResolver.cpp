@@ -34,15 +34,21 @@ QList<TrailerCandidate> TrailerResolver::preparePool(const QStringList& enabledS
 
         auto fresh = m_repo.freshAppDetails(sourceId, now);
 
-        // Only spend network budget on this source when the cache can't
-        // already fill a playlist — cache-only runs start playback
-        // immediately, breadth grows opportunistically on the runs where
-        // it's needed. This is what makes the "no idle daemon" model work:
-        // state persists in SQLite between short-lived process runs.
-        if (fresh.size() < kMinPoolSizeBeforeDiscovery) {
-            // Reserve roughly a third of this source's budget for
-            // discovery queries, the rest for per-id detail fetches.
-            const int discoveryBudget = std::max(1, budgetPerSource / 3);
+        // Spend network budget on this source's discovery every run, not
+        // just while its cache is thin — a thin pool gets roughly a third
+        // of the budget (fast early growth); a healthy one still gets a
+        // small trickle rather than zero, so the catalog keeps growing
+        // instead of freezing at whatever was discovered early (see
+        // kTrickleDiscoveryBudget's comment). This is still bounded and
+        // still respects the "no idle daemon" model — it only ever spends
+        // budget inside a call made during an already-running screensaver
+        // session, same as before.
+        const bool poolIsThin = fresh.size() < kMinPoolSizeBeforeDiscovery;
+        const int discoveryBudget = poolIsThin
+            ? std::max(1, budgetPerSource / 3)
+            : std::min(budgetPerSource, kTrickleDiscoveryBudget);
+
+        if (discoveryBudget > 0) {
             const auto newIds = source->discoverCandidates(filter, discoveryBudget);
             logInfo(QStringLiteral("preparePool[%1]: fresh=%2 discovered=%3 detailBudget=%4")
                         .arg(sourceId).arg(fresh.size()).arg(newIds.size()).arg(budgetPerSource - discoveryBudget));

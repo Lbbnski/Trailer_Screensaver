@@ -42,7 +42,21 @@ private:
     CacheRepository& m_repo;
     AdvancedConfig m_advanced;
 
-    static constexpr int kMinPoolSizeBeforeDiscovery = 30;
+    // Below this, a source gets a full third of its per-run budget for
+    // discovery (the rest for detail fetches) — fast early growth. 150 is
+    // comfortably larger than any single shuffled playlist would visibly
+    // cycle through in one screensaver session.
+    static constexpr int kMinPoolSizeBeforeDiscovery = 150;
+
+    // Once a source's pool is past kMinPoolSizeBeforeDiscovery, it still
+    // gets this much of its budget for discovery every run rather than
+    // zero — without this, discovery hard-stops entirely for the full
+    // cacheTtlDaysAppDetails staleness window (weeks) the moment the
+    // threshold is first reached, freezing the catalog at whatever was
+    // discovered early (worse still when GenreFilter::preferPopular biases
+    // that early discovery toward the same handful of top-played titles).
+    // This trickle keeps the catalog slowly growing forever instead.
+    static constexpr int kTrickleDiscoveryBudget = 3;
 };
 
 } // namespace ssv

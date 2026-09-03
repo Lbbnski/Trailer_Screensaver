@@ -4,6 +4,7 @@
 
 #include <QDateTime>
 #include <QNetworkAccessManager>
+#include <QRandomGenerator>
 
 #include <algorithm>
 
@@ -62,6 +63,13 @@ QList<QString> SteamTrailerSource::discoverCandidates(const GenreFilter& filter,
         discovered.removeDuplicates();
         return discovered;
     }
+
+    // Shuffled so a request budget smaller than genresToSearch.size() (the
+    // common case once TrailerResolver's trickle-discovery budget kicks
+    // in) doesn't always exhaust itself on the same first few genres in a
+    // fixed order every run — without this, whichever genres happen to
+    // sort first would get discovered forever while later ones never do.
+    std::shuffle(genresToSearch.begin(), genresToSearch.end(), *QRandomGenerator::global());
 
     // Spread the per-run request budget across the genres being searched
     // this call, at least one request per genre touched.

@@ -7,6 +7,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QRandomGenerator>
 
 #include <algorithm>
 
@@ -119,6 +120,12 @@ QList<QString> IgdbTrailerSource::discoverCandidates(const GenreFilter& filter, 
         discovered.removeDuplicates();
         return discovered;
     }
+
+    // Shuffled so a request budget smaller than genresToSearch.size() (the
+    // common case once TrailerResolver's trickle-discovery budget kicks
+    // in) doesn't always exhaust itself on the same first few genres in a
+    // fixed order every run.
+    std::shuffle(genresToSearch.begin(), genresToSearch.end(), *QRandomGenerator::global());
 
     const int perGenreBudget = std::max(1, remaining / static_cast<int>(genresToSearch.size()));
     for (const auto& genre : genresToSearch) {
