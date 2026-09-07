@@ -29,6 +29,18 @@ public:
 
 private:
     CacheRepository& m_repo;
+
+    // When GenreFilter::preferPopular is set, a candidate discovered via one
+    // of its source's popularity-sorted passes (TrailerCandidate::
+    // discoveredAsPopular) is entered into the pre-shuffle list this many
+    // times instead of once, giving it roughly this much better odds of
+    // coming up in any given loop through the playlist. Deliberately a mild
+    // multiplier, not an allow-list restricted to popular titles only:
+    // "prefer" means biased, not exclusive, and every entry still only ever
+    // gets shuffled uniformly among the (weighted) pool, so this can't
+    // reintroduce the identical-order-every-loop problem
+    // wrapPlaylistIndexIfNeeded() fixes — it only changes relative odds.
+    static constexpr int kPopularBoostFactor = 3;
 };
 
 } // namespace ssv

@@ -146,8 +146,11 @@ QStringList SteamGenreCandidateFinder::topPlayed(int requestBudget, CacheReposit
     }
     discovered.removeDuplicates();
 
-    if (!discovered.isEmpty())
+    if (!discovered.isEmpty()) {
         repo.addGenreCandidates(sourceId, kPopularPseudoGenre, discovered, now);
+        for (const auto& id : discovered)
+            m_popularHints.insert(id);
+    }
 
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(sourceId, kPopularPseudoGenre, state);
@@ -213,6 +216,11 @@ QStringList SteamGenreCandidateFinder::discover(const QString& canonicalGenre, i
 QStringList SteamGenreCandidateFinder::tagHintsFor(const QString& nativeId) const
 {
     return m_tagHints.value(nativeId);
+}
+
+bool SteamGenreCandidateFinder::isPopularHint(const QString& nativeId) const
+{
+    return m_popularHints.contains(nativeId);
 }
 
 } // namespace ssv

@@ -2,6 +2,7 @@
 
 #include "cache/CacheRepository.h"
 
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -31,10 +32,17 @@ public:
     // uses (distinct source_id keeps the two sources' rows from colliding).
     QStringList topPlayed(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
+    // True if `nativeId` was returned by topPlayed() during the most recent
+    // call on this instance — IgdbTrailerSource::fetchDetails() merges this
+    // into TrailerCandidate::discoveredAsPopular, mirroring
+    // SteamGenreCandidateFinder::isPopularHint().
+    bool isPopularHint(const QString& nativeId) const;
+
 private:
     QStringList searchPage(const QString& whereClause, int offset, int limit, bool* hasMore);
 
     IgdbClient& m_client;
+    QSet<QString> m_popularHints;
 };
 
 } // namespace ssv

@@ -152,7 +152,9 @@ std::optional<TrailerCandidate> IgdbTrailerSource::fetchDetails(const QString& n
     if (results.isEmpty())
         return std::nullopt;
 
-    return parseGame(results.first().toObject());
+    auto candidate = parseGame(results.first().toObject());
+    candidate.discoveredAsPopular = m_candidateFinder.isPopularHint(nativeId);
+    return candidate;
 }
 
 std::optional<TrailerRendition> IgdbTrailerSource::resolveFallback(const TrailerCandidate& candidate)

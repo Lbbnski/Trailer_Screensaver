@@ -87,12 +87,20 @@ QStringList IgdbCandidateFinder::topPlayed(int requestBudget, CacheRepository& r
     bool hasMore = false;
     const auto ids = searchPage(QStringLiteral("total_rating_count > 0"), 0, kSearchPageSize, &hasMore);
 
-    if (!ids.isEmpty())
+    if (!ids.isEmpty()) {
         repo.addGenreCandidates(kSourceId, kPopularPseudoGenre, ids, now);
+        for (const auto& id : ids)
+            m_popularHints.insert(id);
+    }
 
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(kSourceId, kPopularPseudoGenre, state);
     return ids;
+}
+
+bool IgdbCandidateFinder::isPopularHint(const QString& nativeId) const
+{
+    return m_popularHints.contains(nativeId);
 }
 
 } // namespace ssv

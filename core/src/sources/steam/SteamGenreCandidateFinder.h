@@ -3,6 +3,7 @@
 #include "cache/CacheRepository.h"
 
 #include <QHash>
+#include <QSet>
 #include <QString>
 #include <QStringList>
 
@@ -60,6 +61,13 @@ public:
     // SteamTrailerSource::fetchDetails() merges this in as a fix.
     QStringList tagHintsFor(const QString& nativeId) const;
 
+    // True if `nativeId` was returned by topPlayed() during the most recent
+    // call on this instance — SteamTrailerSource::fetchDetails() merges this
+    // into TrailerCandidate::discoveredAsPopular the same way tagHintsFor()
+    // is merged into canonicalGenres, since a per-app appdetails fetch has
+    // no notion of "popular" on its own.
+    bool isPopularHint(const QString& nativeId) const;
+
 private:
     QStringList searchStorePage(int genreId, int start, int count, bool* hasMore);
     QStringList steamSpyByGenre(const QString& canonicalGenre);
@@ -68,6 +76,7 @@ private:
 
     QNetworkAccessManager& m_networkManager;
     QHash<QString, QStringList> m_tagHints;
+    QSet<QString> m_popularHints;
 };
 
 } // namespace ssv

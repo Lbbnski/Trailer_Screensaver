@@ -153,8 +153,18 @@ QStringList GogCandidateFinder::topPlayed(int requestBudget, CacheRepository& re
     bool hasMore = false;
     const auto ids = fetchPage(QString(), QStringLiteral("popularity"), 1, &hasMore);
 
-    if (!ids.isEmpty())
+    if (!ids.isEmpty()) {
         repo.addGenreCandidates(kSourceId, kPopularPseudoGenre, ids, now);
+        // fetchPage() already stashed each id's metadata in m_pendingMetadata
+        // (see the class comment) — mark those entries popular directly
+        // rather than tracking a separate hint set, since GogTrailerSource::
+        // fetchDetails() reads the whole TrailerCandidate from there anyway.
+        for (const auto& id : ids) {
+            auto it = m_pendingMetadata.find(id);
+            if (it != m_pendingMetadata.end())
+                it->discoveredAsPopular = true;
+        }
+    }
 
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(kSourceId, kPopularPseudoGenre, state);

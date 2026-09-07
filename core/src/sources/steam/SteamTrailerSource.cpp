@@ -99,6 +99,7 @@ std::optional<TrailerCandidate> SteamTrailerSource::fetchDetails(const QString& 
     // silently fail the very filter that found it.
     candidate->canonicalGenres << m_candidateFinder.tagHintsFor(nativeId);
     candidate->canonicalGenres.removeDuplicates();
+    candidate->discoveredAsPopular = m_candidateFinder.isPopularHint(nativeId);
 
     return candidate;
 }

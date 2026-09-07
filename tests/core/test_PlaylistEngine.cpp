@@ -40,6 +40,8 @@ private slots:
     void recentlyPlayedIsExcluded();
     void knownDeadFallbackIsExcluded();
     void untriedFallbackIsStillOffered();
+    void preferPopularBoostsPopularCandidates();
+    void popularCandidateNotBoostedWithoutPreferPopular();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -146,6 +148,38 @@ void TestPlaylistEngine::untriedFallbackIsStillOffered()
     candidate.renditions.clear(); // needs fallback resolution, but never attempted
 
     const auto playlist = m_engine->buildPlaylist({candidate}, filter);
+    QCOMPARE(playlist.size(), 1);
+}
+
+void TestPlaylistEngine::preferPopularBoostsPopularCandidates()
+{
+    FilterConfig filter;
+    filter.preferPopular = true;
+
+    auto popular = makeCandidate("1", {}, 18);
+    popular.discoveredAsPopular = true;
+    auto ordinary = makeCandidate("2", {}, 18);
+
+    const auto playlist = m_engine->buildPlaylist({popular, ordinary}, filter);
+
+    int popularCount = 0, ordinaryCount = 0;
+    for (const auto& c : playlist) {
+        if (c.nativeId == QStringLiteral("1")) ++popularCount;
+        if (c.nativeId == QStringLiteral("2")) ++ordinaryCount;
+    }
+    QVERIFY(popularCount > ordinaryCount);
+    QCOMPARE(ordinaryCount, 1);
+}
+
+void TestPlaylistEngine::popularCandidateNotBoostedWithoutPreferPopular()
+{
+    FilterConfig filter;
+    filter.preferPopular = false;
+
+    auto popular = makeCandidate("1", {}, 18);
+    popular.discoveredAsPopular = true;
+
+    const auto playlist = m_engine->buildPlaylist({popular}, filter);
     QCOMPARE(playlist.size(), 1);
 }
 

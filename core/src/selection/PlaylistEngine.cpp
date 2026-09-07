@@ -59,7 +59,12 @@ QList<TrailerCandidate> PlaylistEngine::buildPlaylist(const QList<TrailerCandida
             continue; // known unplayable as of a recent attempt
         if (m_repo.playedSince(candidate.sourceId, candidate.nativeId, since))
             continue;
+
         playlist.append(candidate);
+        if (filter.preferPopular && candidate.discoveredAsPopular) {
+            for (int i = 1; i < kPopularBoostFactor; ++i)
+                playlist.append(candidate);
+        }
     }
 
     auto* rng = QRandomGenerator::global();
