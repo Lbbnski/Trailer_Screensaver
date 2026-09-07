@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QNetworkAccessManager>
 #include <QNetworkProxy>
+#include <QRandomGenerator>
 #include <QTimer>
 
 #include <algorithm>
@@ -54,6 +55,19 @@ TrailerRendition selectRendition(const QList<TrailerRendition>& renditions, MaxR
 constexpr int kPrefetchDelayMs = 3000;
 
 } // namespace
+
+void PlaybackSession::wrapPlaylistIndexIfNeeded()
+{
+    if (m_playlistIndex < m_playlist.size())
+        return;
+
+    auto* rng = QRandomGenerator::global();
+    for (int i = m_playlist.size() - 1; i > 0; --i) {
+        const int j = rng->bounded(i + 1);
+        m_playlist.swapItemsAt(i, j);
+    }
+    m_playlistIndex = 0;
+}
 
 PlaybackSession::PlaybackSession(QObject* parent) : QObject(parent) {}
 
@@ -165,8 +179,7 @@ void PlaybackSession::advance(MpvGLWidget* widget)
     if (m_playlist.isEmpty())
         return;
 
-    if (m_playlistIndex >= m_playlist.size())
-        m_playlistIndex = 0; // loop the playlist indefinitely
+    wrapPlaylistIndexIfNeeded(); // loop the playlist indefinitely, reshuffled each pass
 
     // If schedulePrefetch() already did this candidate's resolution work
     // during the previous trailer's playback, use it directly instead of
@@ -191,8 +204,7 @@ void PlaybackSession::advance(MpvGLWidget* widget)
     // for this cycle rather than looping forever on an all-broken playlist.
     const int maxAttempts = std::min(static_cast<int>(m_playlist.size()), 10);
     for (int attempt = 0; attempt < maxAttempts; ++attempt) {
-        if (m_playlistIndex >= m_playlist.size())
-            m_playlistIndex = 0;
+        wrapPlaylistIndexIfNeeded();
 
         TrailerCandidate candidate = m_playlist[m_playlistIndex++];
         logInfo(QStringLiteral("advance: trying \"%1\" (%2/%3)").arg(candidate.title, candidate.sourceId, candidate.nativeId));

@@ -45,8 +45,18 @@ QList<TrailerCandidate> PlaylistEngine::buildPlaylist(const QList<TrailerCandida
     for (const auto& candidate : pool) {
         if (!passesFilter(candidate, filter))
             continue;
-        if (candidate.renditions.isEmpty() && !candidate.needsFallbackResolution)
-            continue; // no way to play this one
+        // needsFallbackResolution is always true here whenever renditions is
+        // empty (see CacheRepository::rowToCandidate) — it can't tell
+        // "not yet tried" apart from "tried and definitely failed". The
+        // fallback_trailers retry-after marker can, so use that instead to
+        // actually stop offering a candidate whose fallback resolution just
+        // failed: without this, TrailerResolver::ensurePlayable() would
+        // re-attempt (and re-fail) the exact same yt-dlp search for it every
+        // time it came up, and PlaylistEngine::advance()'s bounded retry
+        // would keep burning attempts on it instead of reaching a candidate
+        // that's actually playable.
+        if (candidate.renditions.isEmpty() && m_repo.fallbackRecentlyFailed(candidate.sourceId, candidate.nativeId, now))
+            continue; // known unplayable as of a recent attempt
         if (m_repo.playedSince(candidate.sourceId, candidate.nativeId, since))
             continue;
         playlist.append(candidate);

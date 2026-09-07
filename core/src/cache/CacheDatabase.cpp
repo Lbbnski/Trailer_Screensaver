@@ -86,6 +86,26 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
     // which is expected and not logged as an error.
     q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN developer TEXT"));
 
+    // Marks a fallback_trailers row as "known unplayable until this time" —
+    // written when YoutubeFallbackResolver::resolve() fails to find a
+    // trustworthy match (video_id/query_used stay empty for that row).
+    // Without this, a candidate with no rendition of its own that YouTube
+    // search can't match gets re-attempted via a fresh yt-dlp subprocess
+    // *every single time* it comes up in the playlist forever, and — since
+    // it never records a fallback video id — PlaylistEngine had no way to
+    // tell it apart from a candidate that simply hasn't been tried yet,
+    // so it kept re-offering the same chronically-dead candidates instead
+    // of ever excluding them (see TrailerResolver::kFallbackRetryAfterSeconds).
+    q.exec(QStringLiteral("ALTER TABLE fallback_trailers ADD COLUMN retry_after INTEGER NOT NULL DEFAULT 0"));
+
+    // True once a candidate has been seen in a source's popularity-sorted
+    // discovery pass (SteamSpy's top100*, GOG's "popularity" sort, IGDB's
+    // total_rating_count) — lets PlaylistEngine actually give
+    // GenreFilter::preferPopular an effect on which candidates get played,
+    // not just on which ones get discovered into the cache in the first
+    // place (see PlaylistEngine::buildPlaylist's popularity weighting).
+    q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN is_popular INTEGER NOT NULL DEFAULT 0"));
+
     return true;
 }
 

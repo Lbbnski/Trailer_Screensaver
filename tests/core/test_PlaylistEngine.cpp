@@ -38,6 +38,8 @@ private slots:
     void ageCutoffExcludesOverAgeCandidates();
     void blockedContentDescriptorExcludesRegardlessOfAge();
     void recentlyPlayedIsExcluded();
+    void knownDeadFallbackIsExcluded();
+    void untriedFallbackIsStillOffered();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -121,6 +123,30 @@ void TestPlaylistEngine::recentlyPlayedIsExcluded()
 
     const auto playlist = m_engine->buildPlaylist({candidate}, filter, /*noRepeatWindowSeconds=*/3600);
     QVERIFY(playlist.isEmpty());
+}
+
+void TestPlaylistEngine::knownDeadFallbackIsExcluded()
+{
+    FilterConfig filter;
+    TrailerCandidate candidate = makeCandidate("1", {}, 18);
+    candidate.renditions.clear(); // needs fallback resolution
+
+    m_repo->recordFallbackFailure(candidate.sourceId, candidate.nativeId,
+                                   QDateTime::currentSecsSinceEpoch(),
+                                   QDateTime::currentSecsSinceEpoch() + 3600);
+
+    const auto playlist = m_engine->buildPlaylist({candidate}, filter);
+    QVERIFY(playlist.isEmpty());
+}
+
+void TestPlaylistEngine::untriedFallbackIsStillOffered()
+{
+    FilterConfig filter;
+    TrailerCandidate candidate = makeCandidate("1", {}, 18);
+    candidate.renditions.clear(); // needs fallback resolution, but never attempted
+
+    const auto playlist = m_engine->buildPlaylist({candidate}, filter);
+    QCOMPARE(playlist.size(), 1);
 }
 
 QTEST_MAIN(TestPlaylistEngine)

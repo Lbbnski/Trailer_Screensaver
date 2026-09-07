@@ -46,6 +46,19 @@ public:
                                const QString& queryUsed, const QString& videoId, qint64 resolvedAtEpoch);
     std::optional<QString> fallbackVideoId(const QString& sourceId, const QString& nativeId) const;
 
+    // Records that a fallback resolution attempt (e.g. YoutubeFallbackResolver::resolve())
+    // found nothing trustworthy, and shouldn't be retried until retryAfterEpoch.
+    // Never overwrites an already-successful cached video id for the same
+    // (sourceId, nativeId) — see the ON CONFLICT guard in the .cpp.
+    void recordFallbackFailure(const QString& sourceId, const QString& nativeId,
+                                qint64 failedAtEpoch, qint64 retryAfterEpoch);
+
+    // True if the most recent fallback attempt for this candidate failed and
+    // its retry-after window hasn't elapsed yet — callers should treat this
+    // the same as "no way to play this right now" without re-attempting
+    // resolution (see TrailerResolver::ensurePlayable / PlaylistEngine::buildPlaylist).
+    bool fallbackRecentlyFailed(const QString& sourceId, const QString& nativeId, qint64 nowEpoch) const;
+
     // --- playback_history: small ring buffer to avoid immediate repeats ---
     void recordPlayback(const QString& sourceId, const QString& nativeId, qint64 playedAtEpoch);
     bool playedSince(const QString& sourceId, const QString& nativeId, qint64 sinceEpoch) const;

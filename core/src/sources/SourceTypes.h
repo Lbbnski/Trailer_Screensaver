@@ -34,6 +34,13 @@ struct TrailerCandidate {
 
     QList<TrailerRendition> renditions; // empty if the source has no trailer for this candidate
     bool needsFallbackResolution = false; // true if renditions is empty and a fallback should be attempted
+
+    // True if this candidate was ever seen in one of its source's
+    // popularity-sorted discovery passes (see IMetadataSource::discoverCandidates'
+    // preferPopular handling). Sticky once set — see CacheRepository::upsertAppDetails
+    // — used by PlaylistEngine to actually give GenreFilter::preferPopular an
+    // effect on playback, not just on discovery order.
+    bool discoveredAsPopular = false;
 };
 
 // What the user's genre filter setting selects.

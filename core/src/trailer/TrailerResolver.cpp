@@ -86,14 +86,26 @@ std::optional<TrailerRendition> TrailerResolver::ensurePlayable(TrailerCandidate
     if (!source)
         return std::nullopt;
 
-    const auto fallback = source->resolveFallback(candidate);
-    if (!fallback)
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+
+    // Already know this one's dead as of a recent attempt — skip straight
+    // to "unplayable" instead of re-running a (usually multi-second, yt-dlp
+    // subprocess-backed) resolution that's very likely to fail the same way
+    // again. PlaylistEngine::buildPlaylist should normally have already
+    // excluded this candidate for the same reason; this check stays as a
+    // second line of defense for a candidate resolved outside that path.
+    if (m_repo.fallbackRecentlyFailed(candidate.sourceId, candidate.nativeId, now))
         return std::nullopt;
+
+    const auto fallback = source->resolveFallback(candidate);
+    if (!fallback) {
+        m_repo.recordFallbackFailure(candidate.sourceId, candidate.nativeId, now, now + kFallbackRetryAfterSeconds);
+        return std::nullopt;
+    }
 
     candidate.renditions.append(*fallback);
     candidate.needsFallbackResolution = false;
 
-    const qint64 now = QDateTime::currentSecsSinceEpoch();
     const qint64 staleAfterSeconds = 21LL * 24 * 3600; // matches default cacheTtlDaysAppDetails; caller-provided TTL not needed for this incremental update
     m_repo.upsertAppDetails(candidate, /*hasTrailer=*/true, now, now + staleAfterSeconds);
 

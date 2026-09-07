@@ -57,6 +57,18 @@ private:
     // that early discovery toward the same handful of top-played titles).
     // This trickle keeps the catalog slowly growing forever instead.
     static constexpr int kTrickleDiscoveryBudget = 3;
+
+    // How long a failed fallback resolution (YoutubeFallbackResolver found
+    // nothing trustworthy) sticks before being retried. Long enough that a
+    // chronically-unmatchable candidate (obscure title, no real trailer
+    // exists) stops being retried on every single playlist pass — which
+    // previously meant re-running a full yt-dlp subprocess for it every
+    // time it came up, and PlaylistEngine offering it forever since it had
+    // no way to tell "not yet tried" from "tried and failed". Short enough
+    // that a candidate whose failure was down to a transient network hiccup,
+    // or a trailer uploaded to YouTube after the first attempt, gets picked
+    // up again within a few days rather than being blacklisted forever.
+    static constexpr qint64 kFallbackRetryAfterSeconds = 3LL * 24 * 3600;
 };
 
 } // namespace ssv

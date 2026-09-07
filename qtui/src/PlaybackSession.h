@@ -62,6 +62,16 @@ private:
     void advance(MpvGLWidget* widget);
     void loadIntoPlayer(MpvGLWidget* widget, const TrailerCandidate& candidate, const TrailerRendition& rendition);
 
+    // Wraps m_playlistIndex back to 0 if it's run off the end, reshuffling
+    // m_playlist first. Without the reshuffle, a session that plays long
+    // enough to loop the playlist replays the exact same fixed order every
+    // single pass — since the playable subset of any given pool is usually
+    // much smaller than the raw pool (most candidates need a fallback
+    // resolution that often fails), this is what actually produced the "same
+    // handful of trailers over and over" symptom: not too few candidates,
+    // but the same few always landing in the same relative order forever.
+    void wrapPlaylistIndexIfNeeded();
+
     // Resolving a candidate's playable rendition can mean a Steam API call
     // and/or a blocking yt-dlp subprocess invocation, each taking a couple
     // of seconds — doing that only *after* the current trailer ends is

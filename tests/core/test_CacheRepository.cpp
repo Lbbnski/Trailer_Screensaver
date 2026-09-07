@@ -16,6 +16,9 @@ private slots:
     void freshDetailsRespectsStaleAfter();
     void candidatePageStatePersists();
     void fallbackVideoIdRoundTrips();
+    void fallbackFailureBlocksUntilRetryAfter();
+    void fallbackFailureNeverClobbersSuccess();
+    void isPopularStaysStickyAcrossUpserts();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -86,6 +89,46 @@ void TestCacheRepository::fallbackVideoIdRoundTrips()
     const auto videoId = m_repo->fallbackVideoId("steam", "99");
     QVERIFY(videoId.has_value());
     QCOMPARE(*videoId, QStringLiteral("abc123"));
+}
+
+void TestCacheRepository::fallbackFailureBlocksUntilRetryAfter()
+{
+    QVERIFY(!m_repo->fallbackRecentlyFailed("steam", "7", 5000));
+
+    m_repo->recordFallbackFailure("steam", "7", 5000, 6000);
+
+    QVERIFY(m_repo->fallbackRecentlyFailed("steam", "7", 5500));  // now < retry_after
+    QVERIFY(!m_repo->fallbackRecentlyFailed("steam", "7", 6500)); // now > retry_after
+}
+
+void TestCacheRepository::fallbackFailureNeverClobbersSuccess()
+{
+    m_repo->cacheFallbackVideoId("steam", "8", "some game trailer", "xyz789", 5000);
+
+    m_repo->recordFallbackFailure("steam", "8", 6000, 7000);
+
+    const auto videoId = m_repo->fallbackVideoId("steam", "8");
+    QVERIFY(videoId.has_value());
+    QCOMPARE(*videoId, QStringLiteral("xyz789"));
+    QVERIFY(!m_repo->fallbackRecentlyFailed("steam", "8", 6500));
+}
+
+void TestCacheRepository::isPopularStaysStickyAcrossUpserts()
+{
+    TrailerCandidate candidate;
+    candidate.sourceId = QStringLiteral("steam");
+    candidate.nativeId = QStringLiteral("55");
+    candidate.discoveredAsPopular = true;
+
+    m_repo->upsertAppDetails(candidate, false, 1000, 2000);
+    QVERIFY(m_repo->getAppDetails("steam", "55")->discoveredAsPopular);
+
+    // A later refresh that doesn't happen to come from a popularity-sorted
+    // discovery pass this time (the common case: most refreshes come from
+    // genre discovery) must not un-set a popularity flag learned earlier.
+    candidate.discoveredAsPopular = false;
+    m_repo->upsertAppDetails(candidate, false, 3000, 4000);
+    QVERIFY(m_repo->getAppDetails("steam", "55")->discoveredAsPopular);
 }
 
 QTEST_MAIN(TestCacheRepository)

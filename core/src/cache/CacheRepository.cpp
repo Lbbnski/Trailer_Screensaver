@@ -67,6 +67,7 @@ TrailerCandidate rowToCandidate(const QSqlQuery& q)
     c.contentDescriptors = fromJsonArray(q.value("content_descriptors").toByteArray());
     c.renditions = renditionsFromJson(q.value("renditions_json").toByteArray());
     c.needsFallbackResolution = c.renditions.isEmpty();
+    c.discoveredAsPopular = q.value("is_popular").toInt() != 0;
     return c;
 }
 
@@ -81,14 +82,15 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.prepare(R"(
         INSERT INTO apps (source_id, native_id, title, developer, canonical_genres, age_rating,
                            content_descriptors, renditions_json, has_trailer,
-                           details_fetched_at, details_stale_after)
+                           details_fetched_at, details_stale_after, is_popular)
         VALUES (:source_id, :native_id, :title, :developer, :genres, :age,
-                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after)
+                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after, :is_popular)
         ON CONFLICT(source_id, native_id) DO UPDATE SET
             title=excluded.title, developer=excluded.developer, canonical_genres=excluded.canonical_genres,
             age_rating=excluded.age_rating, content_descriptors=excluded.content_descriptors,
             renditions_json=excluded.renditions_json, has_trailer=excluded.has_trailer,
-            details_fetched_at=excluded.details_fetched_at, details_stale_after=excluded.details_stale_after
+            details_fetched_at=excluded.details_fetched_at, details_stale_after=excluded.details_stale_after,
+            is_popular=MAX(is_popular, excluded.is_popular)
     )");
     q.bindValue(":source_id", candidate.sourceId);
     q.bindValue(":native_id", candidate.nativeId);
@@ -101,6 +103,7 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.bindValue(":has_trailer", hasTrailer ? 1 : 0);
     q.bindValue(":fetched_at", fetchedAtEpoch);
     q.bindValue(":stale_after", staleAfterEpoch);
+    q.bindValue(":is_popular", candidate.discoveredAsPopular ? 1 : 0);
 
     if (!q.exec())
         logError(QStringLiteral("upsertAppDetails failed: %1").arg(q.lastError().text()));
@@ -254,6 +257,41 @@ std::optional<QString> CacheRepository::fallbackVideoId(const QString& sourceId,
         return std::nullopt;
     const auto videoId = q.value(0).toString();
     return videoId.isEmpty() ? std::nullopt : std::make_optional(videoId);
+}
+
+void CacheRepository::recordFallbackFailure(const QString& sourceId, const QString& nativeId,
+                                             qint64 failedAtEpoch, qint64 retryAfterEpoch)
+{
+    QSqlQuery q(m_db.handle());
+    // The WHERE clause on the DO UPDATE means a row that already holds a
+    // successfully-resolved video_id is left untouched — this only ever
+    // records/refreshes a "known dead" marker, never clobbers a working one.
+    q.prepare(R"(
+        INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, retry_after)
+        VALUES (:s, :n, '', '', :t, :retry)
+        ON CONFLICT(source_id, native_id) DO UPDATE SET
+            resolved_at=excluded.resolved_at, retry_after=excluded.retry_after
+        WHERE video_id IS NULL OR video_id = ''
+    )");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    q.bindValue(":t", failedAtEpoch);
+    q.bindValue(":retry", retryAfterEpoch);
+    if (!q.exec())
+        logError(QStringLiteral("recordFallbackFailure failed: %1").arg(q.lastError().text()));
+}
+
+bool CacheRepository::fallbackRecentlyFailed(const QString& sourceId, const QString& nativeId, qint64 nowEpoch) const
+{
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(SELECT 1 FROM fallback_trailers
+                 WHERE source_id = :s AND native_id = :n
+                   AND (video_id IS NULL OR video_id = '')
+                   AND retry_after > :now)");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    q.bindValue(":now", nowEpoch);
+    return q.exec() && q.next();
 }
 
 void CacheRepository::recordPlayback(const QString& sourceId, const QString& nativeId, qint64 playedAtEpoch)
