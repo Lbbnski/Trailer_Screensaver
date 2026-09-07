@@ -1,5 +1,24 @@
 # Known Limitations
 
+- **Windows TLS deployment needs OpenSSL's runtime DLLs shipped alongside
+  the exe, or every HTTPS discovery request silently breaks.** Qt's default
+  TLS backend selection tries its "openssl" plugin first and, if that
+  plugin fails to *load* (as distinct from failing to negotiate a
+  connection), falls straight through to the built-in "cert-only" backend
+  — which cannot perform a real TLS handshake at all — rather than trying
+  any other backend that IS loadable (e.g. "schannel", confirmed
+  independently loadable in this environment but never even attempted once
+  openssl's load failed). `qopensslbackend.dll` needs `libssl-3-x64.dll`
+  and `libcrypto-3-x64.dll` on the loader's search path, but vcpkg's
+  applocal deployment step only follows an executable's own *direct*
+  link-time dependencies, not a plugin loaded dynamically at runtime via
+  `QPluginLoader` — the same class of gap `sqlite3.dll` needed a manual
+  `copy_if_different` for (see `CMakeLists.txt`'s `ssv_deploy_qt_plugins`).
+  Observed directly: without this, GOG discovery failed on literally every
+  run, and occasional Steam/SteamSpy calls failed intermittently too — with
+  no error surfaced beyond an easy-to-miss log line, indistinguishable from
+  a source just legitimately having nothing to offer.
+
 - **Steam's `appdetails` and `search/results` endpoints are unofficial and
   undocumented.** There's no SLA, and Valve could change the response
   format or rate-limit/soft-ban aggressive callers with no appeal path.
@@ -70,12 +89,19 @@
   category of risk as Steam's own storefront endpoints) — `embed.gog.com`
   and `api.gog.com` are community-reverse-engineered, not published by
   GOG/CDPR. No credentials are needed and no confirmed rate limit was
-  found, but the exact accepted values for the listing endpoint's `sort`
-  and `category` parameters were inferred by analogy with GOG's own
-  storefront UI rather than confirmed against official documentation — an
-  unrecognized value is expected to degrade to GOG's default ordering
-  rather than error, so worst case is a less-ideal discovery order, not a
-  failure.
+  found. The listing endpoint's `category` facet turned out to be a small,
+  genuinely fixed vocabulary — much like Steam's own official `genres` ids
+  (see IgdbGenreMap's comment on the same problem) — and, critically, an
+  *unrecognized* `category` value returns a hard HTTP 500, not a graceful
+  fallback to default ordering as originally assumed. `GogGenreMap` only
+  maps a canonical genre to GOG's `category` facet once verified live to
+  return real results; several genres this app supports (Horror, Puzzle,
+  Platformer, Fighting, Massively Multiplayer, Sci-Fi, Fantasy, Survival,
+  Stealth, Sandbox, Visual Novel, at last check) have no confirmed working
+  facet at all and are left unmapped — GOG just contributes nothing extra
+  for those specific genre searches (still contributes normally for
+  `preferPopular`'s unfiltered listing, and for every genre it does have a
+  facet for) rather than failing.
 - **GOG trailers hosted on Wistia (rather than YouTube) are not resolved.**
   GOG's product-video field reports a `provider` per video; only
   `provider == "youtube"` entries are played directly. Wistia's own

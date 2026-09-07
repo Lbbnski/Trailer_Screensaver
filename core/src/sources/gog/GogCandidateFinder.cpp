@@ -54,7 +54,10 @@ QStringList GogCandidateFinder::fetchPage(const QString& categoryParam, const QS
 
     std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
     if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
-        logWarning(QStringLiteral("gog: listing request failed (category=%1, page=%2)").arg(categoryParam).arg(page));
+        const auto httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        logWarning(QStringLiteral("gog: listing request failed (category=%1, page=%2): %3 (http %4)")
+                       .arg(categoryParam).arg(page).arg(reply->errorString())
+                       .arg(httpStatus.isValid() ? httpStatus.toString() : QStringLiteral("n/a")));
         return {};
     }
 

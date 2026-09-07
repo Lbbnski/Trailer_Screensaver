@@ -54,6 +54,27 @@ function(ssv_deploy_qt_plugins target)
             "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/sqlite3.dll" "$<TARGET_FILE_DIR:${target}>"
     COMMENT "Deploying sqlite3.dll (qsqlite plugin dependency) next to ${target}"
   )
+
+  # Same invisible-to-applocal-deps gap as sqlite3.dll above, for
+  # tls/qopensslbackend.dll's own dependencies. Without libssl-3-x64.dll,
+  # loading that plugin fails outright ("Das angegebene Modul wurde nicht
+  # gefunden" / module not found) — and critically, Qt's TLS backend
+  # selection does NOT fall through to try any other *available* plugin
+  # (e.g. tls/qschannelbackend.dll, confirmed independently loadable) when
+  # its preferred "openssl" backend fails to load; it falls straight to the
+  # built-in "cert-only" backend, which cannot perform a real TLS handshake
+  # at all. Observed directly: this silently broke every HTTPS request the
+  # app makes some fraction of the time (an entire source's discovery could
+  # come back completely empty, indistinguishable from that source just
+  # having nothing to offer, with no error surfaced beyond an easy-to-miss
+  # log line) — see docs/LIMITATIONS.md.
+  add_custom_command(TARGET ${target} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/libssl-3-x64.dll" "$<TARGET_FILE_DIR:${target}>"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/libcrypto-3-x64.dll" "$<TARGET_FILE_DIR:${target}>"
+    COMMENT "Deploying OpenSSL runtime DLLs (qopensslbackend TLS plugin dependency) next to ${target}"
+  )
 endfunction()
 
 add_subdirectory(core)

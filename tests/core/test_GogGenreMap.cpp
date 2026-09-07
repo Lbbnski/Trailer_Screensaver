@@ -11,6 +11,7 @@ private slots:
     void passesThroughUnknownLabelsUnchanged();
     void categoryParamRoundTripsForEveryMappedGenre();
     void categoryParamIsNulloptForGenresGogCannotExpress();
+    void categoryParamIsNulloptForGenresWithNoConfirmedFacet();
 };
 
 void TestGogGenreMap::mapsKnownLabels()
@@ -33,9 +34,18 @@ void TestGogGenreMap::passesThroughUnknownLabelsUnchanged()
 
 void TestGogGenreMap::categoryParamRoundTripsForEveryMappedGenre()
 {
-    const auto param = GogGenreMap::categoryParamFor(QStringLiteral("Horror"));
+    const auto param = GogGenreMap::categoryParamFor(QStringLiteral("Strategy"));
     QVERIFY(param.has_value());
-    QCOMPARE(GogGenreMap::toCanonical(*param), QStringLiteral("Horror"));
+    QCOMPARE(GogGenreMap::toCanonical(*param), QStringLiteral("Strategy"));
+}
+
+void TestGogGenreMap::categoryParamIsNulloptForGenresWithNoConfirmedFacet()
+{
+    // These have real GOG genre *labels* (toCanonicalTable still maps them
+    // when parsing a product's own genres list) but no confirmed, working
+    // `category` query-facet slug — see categoryParamTable()'s comment.
+    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Horror")).has_value());
+    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Sci-Fi")).has_value());
 }
 
 void TestGogGenreMap::categoryParamIsNulloptForGenresGogCannotExpress()
