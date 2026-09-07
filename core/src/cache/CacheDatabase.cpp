@@ -98,6 +98,14 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
     // of ever excluding them (see TrailerResolver::kFallbackRetryAfterSeconds).
     q.exec(QStringLiteral("ALTER TABLE fallback_trailers ADD COLUMN retry_after INTEGER NOT NULL DEFAULT 0"));
 
+    // Defaults to 0 for every pre-existing row, which is always below
+    // CacheRepository::kCurrentFallbackResolverVersion — see that constant's
+    // comment for why that's exactly the point: it's what makes a future
+    // change to YoutubeFallbackResolver's matching logic actually apply to
+    // an already-populated cache instead of being silently inert for every
+    // row resolved before the change.
+    q.exec(QStringLiteral("ALTER TABLE fallback_trailers ADD COLUMN resolver_version INTEGER NOT NULL DEFAULT 0"));
+
     // True once a candidate has been seen in a source's popularity-sorted
     // discovery pass (SteamSpy's top100*, GOG's "popularity" sort, IGDB's
     // total_rating_count) — lets PlaylistEngine actually give

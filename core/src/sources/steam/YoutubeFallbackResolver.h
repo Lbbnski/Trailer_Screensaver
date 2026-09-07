@@ -17,6 +17,12 @@ namespace ssv {
 // reintroduce a staleness bug. At playback time MpvPlayer hands mpv the
 // durable youtube.com/watch?v=<id> URL and lets libmpv's built-in
 // ytdl_hook re-resolve a fresh stream URL every time.
+//
+// IMPORTANT: whenever resolve()'s matching/filtering logic changes in a way
+// that could change which video gets picked for the same query, bump
+// CacheRepository::kCurrentFallbackResolverVersion — otherwise the change
+// has no effect on anything already cached, only on brand-new resolutions,
+// which is very easy to mistake for the fix not working at all.
 class YoutubeFallbackResolver {
 public:
     // maxDurationSeconds <= 0 disables the length filter entirely.

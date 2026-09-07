@@ -16,6 +16,22 @@ class CacheRepository {
 public:
     explicit CacheRepository(CacheDatabase& db);
 
+    // Bump this whenever YoutubeFallbackResolver::resolve()'s matching or
+    // filtering logic changes in a way that could change which video gets
+    // picked for the same query (e.g. adding the movie/TV-category filter
+    // did). fallbackVideoId() and fallbackRecentlyFailed() only trust a
+    // cached row whose resolver_version is at least this value — every
+    // pre-existing row defaults to resolver_version 0 via the schema
+    // migration (see CacheDatabase::migrate), so bumping this constant
+    // automatically makes every previously-cached match (right or wrong)
+    // and every previously-recorded failure eligible for re-evaluation
+    // under the new logic on its next use, instead of a filtering fix
+    // silently having zero effect on an already-populated cache forever —
+    // exactly what happened before this existed: every fallback video id in
+    // a real cache had been resolved before the category filter was added,
+    // so it never got a chance to reject any of them.
+    static constexpr int kCurrentFallbackResolverVersion = 1;
+
     // --- apps: cached TrailerCandidate details ---
     void upsertAppDetails(const TrailerCandidate& candidate, bool hasTrailer,
                            qint64 fetchedAtEpoch, qint64 staleAfterEpoch);

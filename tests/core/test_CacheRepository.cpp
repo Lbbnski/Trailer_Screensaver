@@ -1,6 +1,7 @@
 #include "cache/CacheDatabase.h"
 #include "cache/CacheRepository.h"
 
+#include <QSqlQuery>
 #include <QtTest/QtTest>
 
 #include <memory>
@@ -19,6 +20,8 @@ private slots:
     void fallbackFailureBlocksUntilRetryAfter();
     void fallbackFailureNeverClobbersSuccess();
     void isPopularStaysStickyAcrossUpserts();
+    void staleResolverVersionIsTreatedAsUnresolved();
+    void staleResolverVersionFailureIsNotBlocking();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -129,6 +132,31 @@ void TestCacheRepository::isPopularStaysStickyAcrossUpserts()
     candidate.discoveredAsPopular = false;
     m_repo->upsertAppDetails(candidate, false, 3000, 4000);
     QVERIFY(m_repo->getAppDetails("steam", "55")->discoveredAsPopular);
+}
+
+void TestCacheRepository::staleResolverVersionIsTreatedAsUnresolved()
+{
+    // Simulates a row cached before resolver versioning existed (real ones
+    // default to resolver_version 0 via the schema migration) — must not be
+    // trusted, so a matching-logic change actually gets to re-evaluate it.
+    QSqlQuery insert(m_db->handle());
+    insert.prepare(R"(INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, resolver_version)
+                       VALUES ('steam', '11', 'old query', 'oldvid', 1000, 0))");
+    QVERIFY(insert.exec());
+
+    QVERIFY(!m_repo->fallbackVideoId("steam", "11").has_value());
+}
+
+void TestCacheRepository::staleResolverVersionFailureIsNotBlocking()
+{
+    // Same idea for a failure recorded under an old resolver version: it
+    // shouldn't keep blocking retries under the current logic.
+    QSqlQuery insert(m_db->handle());
+    insert.prepare(R"(INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, retry_after, resolver_version)
+                       VALUES ('steam', '12', '', '', 1000, 999999999999, 0))");
+    QVERIFY(insert.exec());
+
+    QVERIFY(!m_repo->fallbackRecentlyFailed("steam", "12", 1500));
 }
 
 QTEST_MAIN(TestCacheRepository)

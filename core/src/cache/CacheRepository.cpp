@@ -233,16 +233,18 @@ void CacheRepository::cacheFallbackVideoId(const QString& sourceId, const QStrin
 {
     QSqlQuery q(m_db.handle());
     q.prepare(R"(
-        INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at)
-        VALUES (:s, :n, :q, :v, :t)
+        INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, resolver_version)
+        VALUES (:s, :n, :q, :v, :t, :ver)
         ON CONFLICT(source_id, native_id) DO UPDATE SET
-            query_used=excluded.query_used, video_id=excluded.video_id, resolved_at=excluded.resolved_at
+            query_used=excluded.query_used, video_id=excluded.video_id, resolved_at=excluded.resolved_at,
+            resolver_version=excluded.resolver_version
     )");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
     q.bindValue(":q", queryUsed);
     q.bindValue(":v", videoId);
     q.bindValue(":t", resolvedAtEpoch);
+    q.bindValue(":ver", kCurrentFallbackResolverVersion);
     if (!q.exec())
         logError(QStringLiteral("cacheFallbackVideoId failed: %1").arg(q.lastError().text()));
 }
@@ -250,9 +252,10 @@ void CacheRepository::cacheFallbackVideoId(const QString& sourceId, const QStrin
 std::optional<QString> CacheRepository::fallbackVideoId(const QString& sourceId, const QString& nativeId) const
 {
     QSqlQuery q(m_db.handle());
-    q.prepare("SELECT video_id FROM fallback_trailers WHERE source_id = :s AND native_id = :n");
+    q.prepare("SELECT video_id FROM fallback_trailers WHERE source_id = :s AND native_id = :n AND resolver_version >= :ver");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
+    q.bindValue(":ver", kCurrentFallbackResolverVersion);
     if (!q.exec() || !q.next())
         return std::nullopt;
     const auto videoId = q.value(0).toString();
@@ -263,20 +266,28 @@ void CacheRepository::recordFallbackFailure(const QString& sourceId, const QStri
                                              qint64 failedAtEpoch, qint64 retryAfterEpoch)
 {
     QSqlQuery q(m_db.handle());
-    // The WHERE clause on the DO UPDATE means a row that already holds a
-    // successfully-resolved video_id is left untouched — this only ever
-    // records/refreshes a "known dead" marker, never clobbers a working one.
-    q.prepare(R"(
-        INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, retry_after)
-        VALUES (:s, :n, '', '', :t, :retry)
+    // The WHERE clause on the DO UPDATE normally leaves a row that already
+    // holds a successfully-resolved video_id untouched — this only ever
+    // records/refreshes a "known dead" marker, never clobbers a working
+    // match. The "OR resolver_version < %1" arm is what lets it overwrite a
+    // *stale-version* success instead: if a fresh re-resolution attempt
+    // under the current logic just failed for a candidate whose cached
+    // video_id was trusted under an old (possibly since-tightened) version,
+    // that old id needs to actually be cleared, not left in place forever
+    // just because it happens to be non-empty.
+    q.prepare(QStringLiteral(R"(
+        INSERT INTO fallback_trailers (source_id, native_id, query_used, video_id, resolved_at, retry_after, resolver_version)
+        VALUES (:s, :n, '', '', :t, :retry, :ver)
         ON CONFLICT(source_id, native_id) DO UPDATE SET
-            resolved_at=excluded.resolved_at, retry_after=excluded.retry_after
-        WHERE video_id IS NULL OR video_id = ''
-    )");
+            video_id=excluded.video_id, resolved_at=excluded.resolved_at,
+            retry_after=excluded.retry_after, resolver_version=excluded.resolver_version
+        WHERE video_id IS NULL OR video_id = '' OR resolver_version < %1
+    )").arg(kCurrentFallbackResolverVersion));
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
     q.bindValue(":t", failedAtEpoch);
     q.bindValue(":retry", retryAfterEpoch);
+    q.bindValue(":ver", kCurrentFallbackResolverVersion);
     if (!q.exec())
         logError(QStringLiteral("recordFallbackFailure failed: %1").arg(q.lastError().text()));
 }
@@ -287,10 +298,12 @@ bool CacheRepository::fallbackRecentlyFailed(const QString& sourceId, const QStr
     q.prepare(R"(SELECT 1 FROM fallback_trailers
                  WHERE source_id = :s AND native_id = :n
                    AND (video_id IS NULL OR video_id = '')
-                   AND retry_after > :now)");
+                   AND retry_after > :now
+                   AND resolver_version >= :ver)");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
     q.bindValue(":now", nowEpoch);
+    q.bindValue(":ver", kCurrentFallbackResolverVersion);
     return q.exec() && q.next();
 }
 
