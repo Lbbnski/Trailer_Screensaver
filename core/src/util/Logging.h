@@ -7,6 +7,8 @@
 
 #include <functional>
 
+class QJsonObject;
+
 namespace ssv {
 
 // Thin wrapper over qWarning/qInfo/qDebug so call sites don't couple
@@ -25,6 +27,18 @@ void logError(const QString& message);
 // with no attached console, so this file is the only way to ever see a
 // failure after the fact.
 void installFileLogging();
+
+// Appends one JSON object (with a "ts" timestamp field added automatically)
+// as a single line to `path`, for a structured diagnostic trace that's
+// meant to be read back and analyzed rather than skimmed like an ordinary
+// log line — e.g. YoutubeFallbackResolver recording the full yt-dlp
+// metadata it saw for every candidate it evaluated. Capped the same way
+// installFileLogging() caps app.log (starts over once the file gets
+// unreasonably large) since nothing in this app rotates logs. Safe to call
+// often; opens/appends/closes the file each time rather than holding it
+// open, since this is expected to be called far less often than
+// logInfo/logWarning/logError.
+void appendDiagnosticRecord(const QString& path, const QJsonObject& record);
 
 // A small in-process, thread-safe feed of the same lines written to the
 // log file, capped to the most recent lines — lets a debug overlay widget

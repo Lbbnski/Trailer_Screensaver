@@ -1,4 +1,5 @@
 #include "sources/steam/YoutubeFallbackResolver.h"
+#include "config/ConfigPaths.h"
 #include "util/Logging.h"
 #include "util/ProcessRunner.h"
 
@@ -42,12 +43,16 @@ const QSet<QString>& blockedYoutubeCategories()
 // One extra (full, non-flat) yt-dlp invocation per candidate that already
 // passed the cheap title/duration checks — only run for a result that
 // would otherwise be accepted, so this costs nothing for candidates
-// already rejected on title or length. A fetch failure (network hiccup,
-// video removed between the search and this call) returns an empty list,
-// which is treated as "unknown, don't block" by the caller — the same
-// "never over-filter on missing data" behavior every other source's
-// mapping table uses for a value it doesn't recognize.
-QStringList fetchYoutubeCategories(const QString& ytDlpPath, const QString& videoId)
+// already rejected on title or length. Returns the full parsed yt-dlp JSON
+// object (empty on any fetch failure — network hiccup, video removed
+// between the search and this call — treated as "unknown, don't block" by
+// the caller, the same "never over-filter on missing data" behavior every
+// other source's mapping table uses for a value it doesn't recognize).
+// Returning the whole object rather than just "categories" is what lets
+// resolveDiagnosticRecord() below log everything yt-dlp knows about a
+// candidate, not only the one field currently used to filter it — see
+// util/Logging.h's appendDiagnosticRecord.
+QJsonObject fetchYoutubeFullInfo(const QString& ytDlpPath, const QString& videoId)
 {
     const QStringList args{
         "--dump-json",
@@ -58,10 +63,15 @@ QStringList fetchYoutubeCategories(const QString& ytDlpPath, const QString& vide
     if (!result.ok())
         return {};
 
-    QStringList categories;
-    for (const auto& c : QJsonDocument::fromJson(result.stdOut).object().value("categories").toArray())
-        categories << c.toString();
-    return categories;
+    return QJsonDocument::fromJson(result.stdOut).object();
+}
+
+QStringList toStringList(const QJsonArray& arr)
+{
+    QStringList out;
+    for (const auto& v : arr)
+        out << v.toString();
+    return out;
 }
 
 // True if at least half of the game title's non-trivial words show up in
@@ -145,10 +155,23 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
     const auto result = ProcessRunner::run(m_ytDlpPath, args);
     if (!result.ok()) {
         logWarning(QStringLiteral("yt-dlp search failed for \"%1\": %2").arg(query, QString::fromUtf8(result.stdErr)));
+        appendDiagnosticRecord(ConfigPaths::youtubeDiagnosticsLogPath(), QJsonObject{
+            {"gameTitle", gameTitle}, {"developer", developer}, {"query", query},
+            {"outcome", "search_failed"}, {"error", QString::fromUtf8(result.stdErr)},
+        });
         return std::nullopt;
     }
 
+    // Every result yt-dlp's search returned, with whatever was learned about
+    // it and why it was accepted/rejected — logged in full below regardless
+    // of outcome, so a case where every result gets rejected (or the wrong
+    // one gets accepted) can be inspected after the fact instead of only
+    // guessed at from the one-line logInfo/logWarning summaries.
+    QJsonArray evaluated;
     QString closestTitle;
+    std::optional<TrailerRendition> accepted;
+    QString acceptedId;
+
     for (const auto& line : result.stdOut.split('\n')) {
         if (line.trimmed().isEmpty())
             continue;
@@ -160,8 +183,13 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         if (closestTitle.isEmpty())
             closestTitle = title;
 
-        if (!titleLooksLikeMatch(gameTitle, title))
+        QJsonObject entry{{"id", id}, {"title", title}, {"duration", obj.value("duration")}};
+
+        if (!titleLooksLikeMatch(gameTitle, title)) {
+            entry["decision"] = "rejected_title";
+            evaluated.append(entry);
             continue;
+        }
 
         // A missing/null duration (e.g. an unusual entry type) isn't
         // treated as disqualifying on its own — only a duration we
@@ -170,10 +198,21 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         if (m_maxDurationSeconds > 0 && durationValue.isDouble() && durationValue.toInt() > m_maxDurationSeconds) {
             logInfo(QStringLiteral("yt-dlp: \"%1\" is %2s, over the %3s cap — skipping (likely a Let's Play/walkthrough, not a trailer)")
                         .arg(title).arg(durationValue.toInt()).arg(m_maxDurationSeconds));
+            entry["decision"] = "rejected_duration";
+            evaluated.append(entry);
             continue;
         }
 
-        const auto categories = fetchYoutubeCategories(m_ytDlpPath, id);
+        const auto fullInfo = fetchYoutubeFullInfo(m_ytDlpPath, id);
+        const auto categories = toStringList(fullInfo.value("categories").toArray());
+        entry["categories"] = QJsonArray::fromStringList(categories);
+        entry["tags"] = QJsonArray::fromStringList(toStringList(fullInfo.value("tags").toArray()));
+        entry["channel"] = fullInfo.value("channel").toString();
+        entry["uploader"] = fullInfo.value("uploader").toString();
+        entry["viewCount"] = fullInfo.value("view_count");
+        entry["uploadDate"] = fullInfo.value("upload_date").toString();
+        entry["description"] = fullInfo.value("description").toString().left(500);
+
         bool isBlockedCategory = false;
         for (const auto& c : categories) {
             if (blockedYoutubeCategories().contains(c)) {
@@ -185,12 +224,29 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
             logInfo(QStringLiteral("yt-dlp: \"%1\" is categorized \"%2\" on YouTube — skipping "
                                     "(looks like non-game content, e.g. a movie trailer sharing the game's title)")
                         .arg(title, categories.join(QStringLiteral(", "))));
+            entry["decision"] = "rejected_category";
+            evaluated.append(entry);
             continue;
         }
 
-        if (outVideoId) *outVideoId = id;
+        entry["decision"] = "accepted";
+        evaluated.append(entry);
+        accepted = renditionForVideoId(id);
+        acceptedId = id;
+        break;
+    }
+
+    appendDiagnosticRecord(ConfigPaths::youtubeDiagnosticsLogPath(), QJsonObject{
+        {"gameTitle", gameTitle}, {"developer", developer}, {"query", query},
+        {"outcome", accepted ? "accepted" : "no_match"},
+        {"acceptedId", acceptedId},
+        {"results", evaluated},
+    });
+
+    if (accepted) {
+        if (outVideoId) *outVideoId = acceptedId;
         if (outQueryUsed) *outQueryUsed = query;
-        return renditionForVideoId(id);
+        return accepted;
     }
 
     if (!closestTitle.isEmpty()) {

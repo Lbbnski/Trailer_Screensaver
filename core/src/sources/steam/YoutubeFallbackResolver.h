@@ -34,7 +34,13 @@ public:
     // per otherwise-acceptable candidate — categories aren't present in
     // the fast flat-playlist search results at all) — a search can just as
     // easily land on a Let's Play, a full walkthrough, or a same-named
-    // movie's trailer as the actual game trailer. On success, returns a
+    // movie's trailer as the actual game trailer. Every result considered —
+    // including ones rejected on title or duration alone, and the full
+    // yt-dlp metadata (categories, tags, channel, uploader, view count,
+    // description) for any result that got far enough to have that fetched
+    // — is appended as one JSON-Lines record to
+    // ConfigPaths::youtubeDiagnosticsLogPath(), regardless of outcome; see
+    // util/Logging.h's appendDiagnosticRecord. On success, returns a
     // TrailerRendition wrapping the durable
     // watch URL (approxHeight is left at 0 — resolution capping for this
     // rendition happens via mpv's ytdl-format option at playback time, not

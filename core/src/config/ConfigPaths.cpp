@@ -63,4 +63,9 @@ QString debugOverlayFlagPath()
     return QDir(baseConfigDir()).filePath(QStringLiteral("debug_overlay.flag"));
 }
 
+QString youtubeDiagnosticsLogPath()
+{
+    return QDir(baseConfigDir()).filePath(QStringLiteral("youtube_candidates.jsonl"));
+}
+
 } // namespace ssv::ConfigPaths

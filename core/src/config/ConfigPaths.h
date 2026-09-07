@@ -28,4 +28,12 @@ QString logFilePath();
 // inherits environment variables set in a user's own shell.
 QString debugOverlayFlagPath();
 
+// Same directory family: a dedicated JSON-Lines diagnostic trace (distinct
+// from logFilePath()'s plain-text app log) recording, for every video
+// YoutubeFallbackResolver evaluates, whatever metadata yt-dlp reported about
+// it and the decision made — see util/Logging.h's appendDiagnosticRecord().
+// Kept separate so this (comparatively verbose, structured) trace can be
+// read/parsed on its own without wading through ordinary log lines.
+QString youtubeDiagnosticsLogPath();
+
 } // namespace ssv::ConfigPaths

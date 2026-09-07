@@ -7,6 +7,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTextStream>
 
 namespace ssv {
@@ -79,6 +81,28 @@ void installFileLogging()
         return;
 
     qInstallMessageHandler(fileMessageHandler);
+}
+
+void appendDiagnosticRecord(const QString& path, const QJsonObject& record)
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+
+    // Same "start over rather than grow forever" cap as installFileLogging,
+    // just larger — this trace is meant to hold enough real examples
+    // (including the full per-video yt-dlp metadata) to actually analyze,
+    // not just the last few lines.
+    if (QFileInfo(path).size() > 10 * 1024 * 1024)
+        QFile::remove(path);
+
+    QFile file(path);
+    if (!file.open(QIODevice::Append | QIODevice::Text))
+        return;
+
+    QJsonObject withTimestamp = record;
+    withTimestamp.insert(QStringLiteral("ts"), QDateTime::currentDateTime().toString(Qt::ISODate));
+
+    QTextStream out(&file);
+    out << QJsonDocument(withTimestamp).toJson(QJsonDocument::Compact) << '\n';
 }
 
 LogFeed& LogFeed::instance()
