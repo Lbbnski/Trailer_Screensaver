@@ -55,6 +55,23 @@
   (`libmpv-2.dll`) rather than a full dynamic Qt6 DLL set, but this remains
   a maintenance burden across future Qt version upgrades.
 
+- **Windows can dim the desktop's SDR content brightness after this
+  screensaver (or literally any other fullscreen app) runs, on a display
+  with HDR available and Windows' "Auto HDR" setting turned on.** Confirmed
+  with the user directly: it also happens with unrelated fullscreen
+  apps/games on the same machine, and nudging the "SDR content brightness"
+  slider in Settings > Display > HDR (without even changing its value)
+  fixes it instantly. This is Microsoft's own well-documented Windows 11
+  bug where Auto HDR's fullscreen detection desyncs the SDR brightness
+  scalar it applies to the desktop and fails to restore it correctly once
+  the fullscreen app hands control back — nothing this app's code does or
+  could reasonably work around, since the trigger is "a fullscreen window
+  existed," not anything specific to this screensaver's rendering pipeline.
+  Two options: nudge the slider each time it happens, or turn Auto HDR off
+  entirely in Settings > Display > HDR if it bothers you enough to give up
+  its upscaling for the games/apps you'd actually want it for. In short:
+  Windows did this to itself.
+
 - **Independent per-monitor playback multiplies concurrent network/decode
   load with monitor count.** `playback.monitorMode` defaults to
   `independent` (a different trailer per monitor, matching the original
