@@ -68,6 +68,16 @@ public:
     // no notion of "popular" on its own.
     bool isPopularHint(const QString& nativeId) const;
 
+    // Seeds from store.steampowered.com/api/featuredcategories' "new_releases"
+    // and "coming_soon" sections — the same storefront-front-page endpoint
+    // Steam's own site uses, one call for both lists. Genre-based discovery
+    // (steamSpyByGenre/steamSpyByTag/searchStorePage, all sorted by
+    // reviews/popularity) structurally favors long-established games, so
+    // without this a new or not-yet-released title essentially never
+    // surfaces. Cached under the pseudo-genre "__recent__", same plumbing as
+    // topPlayed()'s "__popular__".
+    QStringList newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
+
 private:
     QStringList searchStorePage(int genreId, int start, int count, bool* hasMore);
     QStringList steamSpyByGenre(const QString& canonicalGenre);

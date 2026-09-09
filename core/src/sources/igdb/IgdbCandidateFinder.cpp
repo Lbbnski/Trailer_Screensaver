@@ -12,16 +12,18 @@ namespace {
 constexpr int kSearchPageSize = 200; // IGDB allows up to 500 per request; keep modest given this runs per genre, per short-lived process activation
 const QString kSourceId = QStringLiteral("igdb");
 const QString kPopularPseudoGenre = QStringLiteral("__popular__"); // matches SteamGenreCandidateFinder's convention
+const QString kRecentPseudoGenre = QStringLiteral("__recent__");
 }
 
 IgdbCandidateFinder::IgdbCandidateFinder(IgdbClient& client) : m_client(client) {}
 
-QStringList IgdbCandidateFinder::searchPage(const QString& whereClause, int offset, int limit, bool* hasMore)
+QStringList IgdbCandidateFinder::searchPageSorted(const QString& whereClause, const QString& sortField,
+                                                   int offset, int limit, bool* hasMore)
 {
     *hasMore = false;
 
-    const QString body = QStringLiteral("fields id; where %1; sort total_rating_count desc; offset %2; limit %3;")
-                              .arg(whereClause).arg(offset).arg(limit);
+    const QString body = QStringLiteral("fields id; where %1; sort %2 desc; offset %3; limit %4;")
+                              .arg(whereClause, sortField).arg(offset).arg(limit);
     const auto results = m_client.query(QStringLiteral("games"), body);
 
     QStringList ids;
@@ -33,6 +35,11 @@ QStringList IgdbCandidateFinder::searchPage(const QString& whereClause, int offs
 
     *hasMore = ids.size() >= limit;
     return ids;
+}
+
+QStringList IgdbCandidateFinder::searchPage(const QString& whereClause, int offset, int limit, bool* hasMore)
+{
+    return searchPageSorted(whereClause, QStringLiteral("total_rating_count"), offset, limit, hasMore);
 }
 
 QStringList IgdbCandidateFinder::discover(const QString& canonicalGenre, int requestBudget,
@@ -101,6 +108,41 @@ QStringList IgdbCandidateFinder::topPlayed(int requestBudget, CacheRepository& r
 bool IgdbCandidateFinder::isPopularHint(const QString& nativeId) const
 {
     return m_popularHints.contains(nativeId);
+}
+
+QStringList IgdbCandidateFinder::newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds)
+{
+    if (requestBudget <= 0)
+        return {};
+
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    auto state = repo.candidatePageState(kSourceId, kRecentPseudoGenre);
+    if ((now - state.lastRefreshedAt) <= candidateListTtlSeconds)
+        return {};
+
+    QStringList discovered;
+    int remaining = requestBudget;
+    bool hasMore = false;
+
+    if (remaining > 0) {
+        discovered << searchPageSorted(QStringLiteral("first_release_date > %1 & hypes > 0").arg(now),
+                                        QStringLiteral("hypes"), 0, kSearchPageSize, &hasMore);
+        --remaining;
+    }
+    if (remaining > 0) {
+        const qint64 ninetyDaysAgo = now - 90LL * 24 * 3600;
+        discovered << searchPage(QStringLiteral("first_release_date <= %1 & first_release_date > %2").arg(now).arg(ninetyDaysAgo),
+                                  0, kSearchPageSize, &hasMore);
+        --remaining;
+    }
+    discovered.removeDuplicates();
+
+    if (!discovered.isEmpty())
+        repo.addGenreCandidates(kSourceId, kRecentPseudoGenre, discovered, now);
+
+    state.lastRefreshedAt = now;
+    repo.setCandidatePageState(kSourceId, kRecentPseudoGenre, state);
+    return discovered;
 }
 
 } // namespace ssv

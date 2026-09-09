@@ -4,6 +4,7 @@
 #include "util/NetworkAwait.h"
 
 #include <QDateTime>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -24,6 +25,7 @@ constexpr int kSearchPageSize = 50;
 // (GenreTaxonomy's names are all plain title-cased words), so it can share
 // the genre_candidates/candidate_pages tables without a schema change.
 const QString kPopularPseudoGenre = QStringLiteral("__popular__");
+const QString kRecentPseudoGenre = QStringLiteral("__recent__");
 }
 
 SteamGenreCandidateFinder::SteamGenreCandidateFinder(QNetworkAccessManager& networkManager)
@@ -221,6 +223,51 @@ QStringList SteamGenreCandidateFinder::tagHintsFor(const QString& nativeId) cons
 bool SteamGenreCandidateFinder::isPopularHint(const QString& nativeId) const
 {
     return m_popularHints.contains(nativeId);
+}
+
+QStringList SteamGenreCandidateFinder::newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds)
+{
+    if (requestBudget <= 0)
+        return {};
+
+    const QString sourceId = QStringLiteral("steam");
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    auto state = repo.candidatePageState(sourceId, kRecentPseudoGenre);
+    if ((now - state.lastRefreshedAt) <= candidateListTtlSeconds)
+        return {};
+
+    QUrl url(QStringLiteral("https://store.steampowered.com/api/featuredcategories"));
+    QUrlQuery query;
+    query.addQueryItem("l", "english");
+    query.addQueryItem("cc", "US");
+    url.setQuery(query);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("SteamTrailerScreensaver/1.0"));
+
+    std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
+    if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
+        logWarning(QStringLiteral("Steam featuredcategories request failed"));
+        return {};
+    }
+
+    const auto root = QJsonDocument::fromJson(reply->readAll()).object();
+    QStringList discovered;
+    for (const auto& section : {QStringLiteral("new_releases"), QStringLiteral("coming_soon")}) {
+        for (const auto& v : root.value(section).toObject().value("items").toArray()) {
+            const auto appId = v.toObject().value("id").toVariant().toLongLong();
+            if (appId > 0)
+                discovered << QString::number(appId);
+        }
+    }
+    discovered.removeDuplicates();
+
+    if (!discovered.isEmpty())
+        repo.addGenreCandidates(sourceId, kRecentPseudoGenre, discovered, now);
+
+    state.lastRefreshedAt = now;
+    repo.setCandidatePageState(sourceId, kRecentPseudoGenre, state);
+    return discovered;
 }
 
 } // namespace ssv

@@ -59,6 +59,15 @@ QList<QString> SteamTrailerSource::discoverCandidates(const GenreFilter& filter,
         remaining -= spend;
     }
 
+    // Always spent, not gated behind preferPopular: reviews/popularity-sorted
+    // genre discovery structurally favors long-established games, so without
+    // this a new or not-yet-released title essentially never surfaces.
+    if (remaining > 0) {
+        const int spend = std::min(1, remaining); // one featuredcategories call covers both new_releases and coming_soon
+        discovered << m_candidateFinder.newAndTrending(spend, m_repo, m_candidateListTtlSeconds);
+        remaining -= spend;
+    }
+
     if (remaining <= 0) {
         discovered.removeDuplicates();
         return discovered;

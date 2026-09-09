@@ -82,6 +82,15 @@ QList<QString> GogTrailerSource::discoverCandidates(const GenreFilter& filter, i
         remaining -= spend;
     }
 
+    // Always spent, not gated behind preferPopular — see IgdbTrailerSource's
+    // identical block for why: genre discovery alone structurally favors
+    // older, already-established titles.
+    if (remaining > 0) {
+        const int spend = std::min(1, remaining);
+        discovered << m_candidateFinder.newAndTrending(spend, m_repo, m_candidateListTtlSeconds);
+        remaining -= spend;
+    }
+
     if (remaining <= 0) {
         discovered.removeDuplicates();
         return discovered;

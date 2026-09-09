@@ -116,6 +116,17 @@ QList<QString> IgdbTrailerSource::discoverCandidates(const GenreFilter& filter, 
         remaining -= spend;
     }
 
+    // Always spent, not gated behind preferPopular: genre discovery on its
+    // own structurally favors long-established, heavily-reviewed games (see
+    // topPlayed()'s own bias), so without this an unreleased/just-released
+    // title essentially never surfaces at all, no matter how the user's
+    // other filters are set.
+    if (remaining > 0) {
+        const int spend = std::min(2, remaining);
+        discovered << m_candidateFinder.newAndTrending(spend, m_repo, m_candidateListTtlSeconds);
+        remaining -= spend;
+    }
+
     if (remaining <= 0) {
         discovered.removeDuplicates();
         return discovered;

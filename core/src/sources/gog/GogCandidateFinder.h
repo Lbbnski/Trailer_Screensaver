@@ -40,6 +40,14 @@ public:
     // pseudo-genre key the other sources' topPlayed() use.
     QStringList topPlayed(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
+    // Seeds from GOG's own `sort=date` listing (no genre filter) — verified
+    // live to return upcoming/just-listed products newest-first; genre-based
+    // discovery on its own structurally favors older, already-established
+    // titles, so without this a new/upcoming game essentially never
+    // surfaces. Cached under the pseudo-genre "__recent__", same plumbing as
+    // topPlayed()'s "__popular__".
+    QStringList newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
+
     // Metadata (everything but videos) for a native id discovered by the
     // most recent discover()/topPlayed() call on this instance. Empty
     // (default-constructed) TrailerCandidate if the id wasn't just

@@ -21,6 +21,7 @@ namespace {
 constexpr int kPageSize = 48; // embed.gog.com's own page size, observed directly
 const QString kSourceId = QStringLiteral("gog");
 const QString kPopularPseudoGenre = QStringLiteral("__popular__");
+const QString kRecentPseudoGenre = QStringLiteral("__recent__");
 } // namespace
 
 GogCandidateFinder::GogCandidateFinder(QNetworkAccessManager& networkManager)
@@ -37,12 +38,11 @@ QStringList GogCandidateFinder::fetchPage(const QString& categoryParam, const QS
     query.addQueryItem("mediaType", "game");
     if (!categoryParam.isEmpty())
         query.addQueryItem("category", categoryParam);
-    // "popularity" is a reasonable-looking sort value by analogy with GOG's
-    // own storefront UI, but wasn't independently confirmed against a
-    // documented list of accepted values — if GOG doesn't recognize it, the
-    // endpoint is expected to just fall back to its own default ordering
-    // rather than error, which only costs the (purely cosmetic)
-    // preferPopular bias, not correctness.
+    // Both "popularity" and "date" were verified live to return real,
+    // correctly-ordered results (unlike `category` — see GogGenreMap's
+    // comment — an unrecognized `sort` value doesn't necessarily degrade
+    // gracefully either, so don't add a new one here without checking it
+    // returns 200 with real, correctly-ordered products first).
     if (!sort.isEmpty())
         query.addQueryItem("sort", sort);
     query.addQueryItem("page", QString::number(page));
@@ -171,6 +171,27 @@ QStringList GogCandidateFinder::topPlayed(int requestBudget, CacheRepository& re
 
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(kSourceId, kPopularPseudoGenre, state);
+    return ids;
+}
+
+QStringList GogCandidateFinder::newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds)
+{
+    if (requestBudget <= 0)
+        return {};
+
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    auto state = repo.candidatePageState(kSourceId, kRecentPseudoGenre);
+    if ((now - state.lastRefreshedAt) <= candidateListTtlSeconds)
+        return {};
+
+    bool hasMore = false;
+    const auto ids = fetchPage(QString(), QStringLiteral("date"), 1, &hasMore);
+
+    if (!ids.isEmpty())
+        repo.addGenreCandidates(kSourceId, kRecentPseudoGenre, ids, now);
+
+    state.lastRefreshedAt = now;
+    repo.setCandidatePageState(kSourceId, kRecentPseudoGenre, state);
     return ids;
 }
 
