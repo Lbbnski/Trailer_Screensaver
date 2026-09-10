@@ -56,6 +56,16 @@ struct AdvancedConfig {
     // qtui/src/DebugOverlay.h) — a troubleshooting aid, off by default so
     // normal use never shows it.
     bool debugOverlay = false;
+
+    // Windows only (silently ignored on Linux — see apps/win-scr/src/
+    // HdrBrightnessWorkaround.h). Attempts to work around a known Windows
+    // 11 "Auto HDR" bug where the desktop's SDR content brightness stays
+    // wrong after this (or any other) fullscreen app exits, by toggling
+    // Advanced Color off and back on for each HDR-enabled display when the
+    // screensaver closes. Off by default: unverified against a real HDR
+    // display, and it causes a brief flicker on any display it touches —
+    // see docs/LIMITATIONS.md before turning this on.
+    bool workaroundHdrBrightnessReset = false;
 };
 
 // Root config object, persisted as JSON at ConfigPaths::configFilePath().

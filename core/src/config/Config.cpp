@@ -99,6 +99,7 @@ QByteArray Config::toJson() const
         {"ytDlpPath", advanced.ytDlpPath},
         {"debugOverlay", advanced.debugOverlay},
         {"maxTrailerDurationSeconds", advanced.maxTrailerDurationSeconds},
+        {"workaroundHdrBrightnessReset", advanced.workaroundHdrBrightnessReset},
     };
 
     QJsonObject root{
@@ -156,6 +157,7 @@ Config Config::fromJson(const QByteArray& json, bool* ok)
     cfg.advanced.ytDlpPath = advancedObj.value("ytDlpPath").toString(QStringLiteral("yt-dlp"));
     cfg.advanced.debugOverlay = advancedObj.value("debugOverlay").toBool(false);
     cfg.advanced.maxTrailerDurationSeconds = advancedObj.value("maxTrailerDurationSeconds").toInt(600);
+    cfg.advanced.workaroundHdrBrightnessReset = advancedObj.value("workaroundHdrBrightnessReset").toBool(false);
 
     if (ok) *ok = true;
     return cfg;

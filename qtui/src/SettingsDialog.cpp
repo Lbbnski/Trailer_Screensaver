@@ -52,6 +52,17 @@ void SettingsDialog::buildUi()
     m_debugOverlayCheck = new QCheckBox(tr("Show debug log overlay"), playbackBox);
     playbackForm->addRow(QString(), m_debugOverlayCheck);
 
+    m_hdrBrightnessWorkaroundCheck = new QCheckBox(
+        tr("Try to fix HDR brightness reset on exit (Windows, experimental)"), playbackBox);
+    m_hdrBrightnessWorkaroundCheck->setToolTip(tr(
+        "Works around a Windows 11 bug where the desktop's SDR content "
+        "brightness stays wrong after this screensaver (or any other "
+        "fullscreen app) exits, on a display with HDR available and "
+        "Windows' Auto HDR setting on. Causes a brief flicker on any "
+        "HDR-enabled display when the screensaver closes. Unverified on a "
+        "real HDR display — try it and see if it actually helps."));
+    playbackForm->addRow(QString(), m_hdrBrightnessWorkaroundCheck);
+
     root->addWidget(playbackBox);
 
     // --- Filter ---
@@ -141,6 +152,7 @@ void SettingsDialog::loadConfig()
     m_mutedCheck->setChecked(cfg.playback.muted);
     m_hardwareDecodeCheck->setChecked(cfg.playback.hardwareDecode);
     m_debugOverlayCheck->setChecked(cfg.advanced.debugOverlay);
+    m_hdrBrightnessWorkaroundCheck->setChecked(cfg.advanced.workaroundHdrBrightnessReset);
 
     m_allowListRadio->setChecked(cfg.filter.mode == GenreFilter::Mode::AllowList);
     m_blockListRadio->setChecked(cfg.filter.mode == GenreFilter::Mode::BlockList);
@@ -169,6 +181,7 @@ Config SettingsDialog::collectConfig() const
     cfg.playback.muted = m_mutedCheck->isChecked();
     cfg.playback.hardwareDecode = m_hardwareDecodeCheck->isChecked();
     cfg.advanced.debugOverlay = m_debugOverlayCheck->isChecked();
+    cfg.advanced.workaroundHdrBrightnessReset = m_hdrBrightnessWorkaroundCheck->isChecked();
 
     cfg.filter.mode = m_blockListRadio->isChecked() ? GenreFilter::Mode::BlockList : GenreFilter::Mode::AllowList;
     cfg.filter.genres = m_genreModel->checkedGenres();

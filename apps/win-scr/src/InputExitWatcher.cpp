@@ -1,4 +1,6 @@
 #include "InputExitWatcher.h"
+#include "HdrBrightnessWorkaround.h"
+#include "config/Config.h"
 #include "util/Logging.h"
 
 #define WIN32_LEAN_AND_MEAN
@@ -19,6 +21,18 @@ bool g_haveOrigin = false;
 void requestQuit(const QString& reason)
 {
     logInfo(QStringLiteral("InputExitWatcher: exiting (%1)").arg(reason));
+
+    // ExitProcess below skips every C++ destructor, so this is the only
+    // place in the whole real (input-triggered) exit path where anything
+    // can still run — a hook anywhere else (e.g. FullscreenController's
+    // destructor) would simply never fire in practice. Reloading config
+    // here rather than threading it through is deliberate: this runs
+    // exactly once, right before the process ends, so the tiny cost of
+    // re-reading config.json isn't worth restructuring this class's
+    // lifetime (constructed before PlaybackSession::start() has even
+    // loaded it) to avoid.
+    if (Config::load().advanced.workaroundHdrBrightnessReset)
+        tryResetHdrBrightnessOnExit();
 
     // Deliberately not qApp->quit(): that only posts a quit event onto the
     // main thread's event loop, and this app spends long stretches inside

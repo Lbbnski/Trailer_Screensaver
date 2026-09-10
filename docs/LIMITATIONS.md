@@ -64,13 +64,27 @@
   fixes it instantly. This is Microsoft's own well-documented Windows 11
   bug where Auto HDR's fullscreen detection desyncs the SDR brightness
   scalar it applies to the desktop and fails to restore it correctly once
-  the fullscreen app hands control back — nothing this app's code does or
-  could reasonably work around, since the trigger is "a fullscreen window
-  existed," not anything specific to this screensaver's rendering pipeline.
-  Two options: nudge the slider each time it happens, or turn Auto HDR off
-  entirely in Settings > Display > HDR if it bothers you enough to give up
-  its upscaling for the games/apps you'd actually want it for. In short:
-  Windows did this to itself.
+  the fullscreen app hands control back — the trigger is "a fullscreen
+  window existed," not anything specific to this screensaver's rendering
+  pipeline. Turning Auto HDR off entirely in Settings > Display > HDR is
+  the sure fix, at the cost of losing its upscaling for the games/apps
+  you'd actually want it for.
+
+  There's also an experimental, opt-in mitigation now: "Try to fix HDR
+  brightness reset on exit" in Settings (`advanced.workaroundHdrBrightnessReset`,
+  off by default). There is no public Windows API to directly set the
+  SDR-brightness scalar itself — `DISPLAYCONFIG_SDR_WHITE_LEVEL` is
+  read-only — so this instead toggles a display's Advanced Color (HDR)
+  state off and back on via `DisplayConfigSetDeviceInfo` right before the
+  process exits (see `apps/win-scr/src/HdrBrightnessWorkaround.cpp`), the
+  same public CCD API third-party HDR-toggle utilities use, and the same
+  class of "force Windows to recompute the mapping" event as nudging the
+  slider. Verified end-to-end (real input-triggered exit path, correct
+  detection of a non-HDR display so it doesn't needlessly toggle one) —
+  but not against a real HDR display, since none was available during
+  development. Causes a brief flicker on every HDR-enabled display it
+  touches; enable it and see whether it actually fixes the brightness, in
+  which case please report back.
 
 - **Independent per-monitor playback multiplies concurrent network/decode
   load with monitor count.** `playback.monitorMode` defaults to

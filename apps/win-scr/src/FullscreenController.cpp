@@ -14,6 +14,12 @@ FullscreenController::FullscreenController(QObject* parent) : QObject(parent) {}
 
 FullscreenController::~FullscreenController()
 {
+    // NOTE: in practice this destructor never actually runs during a real
+    // screensaver dismiss — InputExitWatcher's requestQuit() calls
+    // ExitProcess() directly (see its own comment for why), which skips
+    // every C++ destructor including this one. Don't rely on this
+    // destructor to do anything observable; see requestQuit() for the one
+    // place that reliably runs before this process ends.
     qDeleteAll(m_windows);
 }
 

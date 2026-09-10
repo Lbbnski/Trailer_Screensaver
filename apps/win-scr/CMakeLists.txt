@@ -8,6 +8,8 @@ add_executable(SteamTrailerSaver WIN32
   src/FullscreenController.cpp
   src/FullscreenWindow.h
   src/FullscreenWindow.cpp
+  src/HdrBrightnessWorkaround.h
+  src/HdrBrightnessWorkaround.cpp
   src/InputExitWatcher.h
   src/InputExitWatcher.cpp
   src/PreviewEmbedWindow.h

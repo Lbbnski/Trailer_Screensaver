@@ -43,6 +43,7 @@ private:
     QCheckBox* m_mutedCheck = nullptr;
     QCheckBox* m_hardwareDecodeCheck = nullptr;
     QCheckBox* m_debugOverlayCheck = nullptr;
+    QCheckBox* m_hdrBrightnessWorkaroundCheck = nullptr;
 
     QRadioButton* m_allowListRadio = nullptr;
     QRadioButton* m_blockListRadio = nullptr;

@@ -12,10 +12,12 @@ namespace ssv {
 // itself rather than routed through the (unfocused) window.
 //
 // This installs low-level global input hooks (WH_KEYBOARD_LL/WH_MOUSE_LL)
-// that see input system-wide regardless of focus, and posts a queued
-// QCoreApplication::quit() the moment real input is seen. Windows-only —
-// on Linux, xscreensaver's own driver already watches for input and kills
-// the hack process itself, so no equivalent is needed there.
+// that see input system-wide regardless of focus, and calls ExitProcess()
+// the moment real input is seen — see requestQuit()'s comment in the .cpp
+// for why that, and not a queued QCoreApplication::quit(), is what actually
+// happens. Windows-only — on Linux, xscreensaver's own driver already
+// watches for input and kills the hack process itself, so no equivalent is
+// needed there.
 class InputExitWatcher {
 public:
     InputExitWatcher();
