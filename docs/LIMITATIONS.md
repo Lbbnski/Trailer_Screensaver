@@ -70,21 +70,16 @@
   the sure fix, at the cost of losing its upscaling for the games/apps
   you'd actually want it for.
 
-  There's also an experimental, opt-in mitigation now: "Try to fix HDR
-  brightness reset on exit" in Settings (`advanced.workaroundHdrBrightnessReset`,
-  off by default). There is no public Windows API to directly set the
-  SDR-brightness scalar itself — `DISPLAYCONFIG_SDR_WHITE_LEVEL` is
-  read-only — so this instead toggles a display's Advanced Color (HDR)
-  state off and back on via `DisplayConfigSetDeviceInfo` right before the
-  process exits (see `apps/win-scr/src/HdrBrightnessWorkaround.cpp`), the
-  same public CCD API third-party HDR-toggle utilities use, and the same
-  class of "force Windows to recompute the mapping" event as nudging the
-  slider. Verified end-to-end (real input-triggered exit path, correct
-  detection of a non-HDR display so it doesn't needlessly toggle one) —
-  but not against a real HDR display, since none was available during
-  development. Causes a brief flicker on every HDR-enabled display it
-  touches; enable it and see whether it actually fixes the brightness, in
-  which case please report back.
+  An in-app mitigation was tried and removed: toggling a display's Advanced
+  Color (HDR) state off and back on via `DisplayConfigSetDeviceInfo` right
+  before the process exits (the same public CCD API third-party HDR-toggle
+  utilities use, and the only public lever close to the read-only
+  `DISPLAYCONFIG_SDR_WHITE_LEVEL`) — confirmed by the user directly that it
+  did not fix the actual brightness. Whatever state Windows fails to
+  restore here isn't the one this API can reach, or nudging the slider
+  triggers a different, unexposed code path than an Advanced Color toggle
+  does. Nudging the slider, or disabling Auto HDR entirely, remain the only
+  confirmed fixes.
 
 - **Independent per-monitor playback multiplies concurrent network/decode
   load with monitor count.** `playback.monitorMode` defaults to
