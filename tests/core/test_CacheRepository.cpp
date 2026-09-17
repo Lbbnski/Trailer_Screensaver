@@ -22,6 +22,10 @@ private slots:
     void isPopularStaysStickyAcrossUpserts();
     void staleResolverVersionIsTreatedAsUnresolved();
     void staleResolverVersionFailureIsNotBlocking();
+    void storeUrlRoundTrips();
+    void playbackHistoryRecordsSnapshotAndOrdersNewestFirst();
+    void blockGameRoundTripsAndCanBeUndone();
+    void fallbackQueryUsedRoundTrips();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -157,6 +161,64 @@ void TestCacheRepository::staleResolverVersionFailureIsNotBlocking()
     QVERIFY(insert.exec());
 
     QVERIFY(!m_repo->fallbackRecentlyFailed("steam", "12", 1500));
+}
+
+void TestCacheRepository::storeUrlRoundTrips()
+{
+    TrailerCandidate candidate;
+    candidate.sourceId = QStringLiteral("gog");
+    candidate.nativeId = QStringLiteral("2001");
+    candidate.storeUrl = QStringLiteral("https://www.gog.com/en/game/example");
+
+    m_repo->upsertAppDetails(candidate, false, 1000, 2000);
+
+    QCOMPARE(m_repo->getAppDetails("gog", "2001")->storeUrl, QStringLiteral("https://www.gog.com/en/game/example"));
+}
+
+void TestCacheRepository::playbackHistoryRecordsSnapshotAndOrdersNewestFirst()
+{
+    m_repo->recordPlayback("steam", "1", "First Game", "Dev A", "https://store.invalid/1",
+                            "https://youtube.invalid/watch?v=aaa", 1000);
+    m_repo->recordPlayback("steam", "2", "Second Game", "Dev B", "https://store.invalid/2",
+                            "https://youtube.invalid/watch?v=bbb", 2000);
+
+    const auto history = m_repo->recentPlaybackHistory(10);
+    QCOMPARE(history.size(), 2);
+    // Newest first.
+    QCOMPARE(history[0].nativeId, QStringLiteral("2"));
+    QCOMPARE(history[0].title, QStringLiteral("Second Game"));
+    QCOMPARE(history[0].developer, QStringLiteral("Dev B"));
+    QCOMPARE(history[0].storeUrl, QStringLiteral("https://store.invalid/2"));
+    QCOMPARE(history[0].videoUrl, QStringLiteral("https://youtube.invalid/watch?v=bbb"));
+    QCOMPARE(history[0].playedAt, qint64(2000));
+    QVERIFY(!history[0].blocked);
+    QCOMPARE(history[1].nativeId, QStringLiteral("1"));
+}
+
+void TestCacheRepository::blockGameRoundTripsAndCanBeUndone()
+{
+    QVERIFY(!m_repo->isGameBlocked("steam", "3"));
+
+    m_repo->blockGame("steam", "3", 5000);
+    QVERIFY(m_repo->isGameBlocked("steam", "3"));
+
+    // recentPlaybackHistory's blocked flag reflects the same state.
+    m_repo->recordPlayback("steam", "3", "Blocked Game", "", "", "", 5000);
+    QVERIFY(m_repo->recentPlaybackHistory(10).first().blocked);
+
+    m_repo->unblockGame("steam", "3");
+    QVERIFY(!m_repo->isGameBlocked("steam", "3"));
+}
+
+void TestCacheRepository::fallbackQueryUsedRoundTrips()
+{
+    QVERIFY(!m_repo->fallbackQueryUsed("steam", "4").has_value());
+
+    m_repo->cacheFallbackVideoId("steam", "4", "some game official trailer", "vid123", 5000);
+
+    const auto query = m_repo->fallbackQueryUsed("steam", "4");
+    QVERIFY(query.has_value());
+    QCOMPARE(*query, QStringLiteral("some game official trailer"));
 }
 
 QTEST_MAIN(TestCacheRepository)

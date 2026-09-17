@@ -68,4 +68,9 @@ QString youtubeDiagnosticsLogPath()
     return QDir(baseConfigDir()).filePath(QStringLiteral("youtube_candidates.jsonl"));
 }
 
+QString reportedTrailersLogPath()
+{
+    return QDir(baseConfigDir()).filePath(QStringLiteral("reported_trailers.jsonl"));
+}
+
 } // namespace ssv::ConfigPaths

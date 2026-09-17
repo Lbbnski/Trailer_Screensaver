@@ -42,6 +42,7 @@ private slots:
     void untriedFallbackIsStillOffered();
     void preferPopularBoostsPopularCandidates();
     void popularCandidateNotBoostedWithoutPreferPopular();
+    void blockedGameIsExcludedRegardlessOfFilter();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -121,7 +122,8 @@ void TestPlaylistEngine::recentlyPlayedIsExcluded()
     FilterConfig filter;
     const auto candidate = makeCandidate("1", {}, 18);
 
-    m_repo->recordPlayback(candidate.sourceId, candidate.nativeId, QDateTime::currentSecsSinceEpoch());
+    m_repo->recordPlayback(candidate.sourceId, candidate.nativeId, candidate.title, candidate.developer,
+                            candidate.storeUrl, QString(), QDateTime::currentSecsSinceEpoch());
 
     const auto playlist = m_engine->buildPlaylist({candidate}, filter, /*noRepeatWindowSeconds=*/3600);
     QVERIFY(playlist.isEmpty());
@@ -181,6 +183,20 @@ void TestPlaylistEngine::popularCandidateNotBoostedWithoutPreferPopular()
 
     const auto playlist = m_engine->buildPlaylist({popular}, filter);
     QCOMPARE(playlist.size(), 1);
+}
+
+void TestPlaylistEngine::blockedGameIsExcludedRegardlessOfFilter()
+{
+    FilterConfig filter; // default allow-list, no restriction — would otherwise pass
+    const auto candidate = makeCandidate("1", {}, 18);
+
+    QVERIFY(m_engine->passesFilter(candidate, filter));
+
+    m_repo->blockGame(candidate.sourceId, candidate.nativeId, QDateTime::currentSecsSinceEpoch());
+    QVERIFY(!m_engine->passesFilter(candidate, filter));
+
+    m_repo->unblockGame(candidate.sourceId, candidate.nativeId);
+    QVERIFY(m_engine->passesFilter(candidate, filter));
 }
 
 QTEST_MAIN(TestPlaylistEngine)

@@ -171,7 +171,9 @@ void PlaybackSession::loadIntoPlayer(MpvGLWidget* widget, const TrailerCandidate
     player->loadFile(rendition.url);
     logInfo(QStringLiteral("advance: loading \"%1\" -> %2").arg(candidate.title, rendition.url));
 
-    m_repo->recordPlayback(candidate.sourceId, candidate.nativeId, QDateTime::currentSecsSinceEpoch());
+    m_repo->recordPlayback(candidate.sourceId, candidate.nativeId,
+                            candidate.title, candidate.developer, candidate.storeUrl,
+                            rendition.url, QDateTime::currentSecsSinceEpoch());
 }
 
 void PlaybackSession::advance(MpvGLWidget* widget)

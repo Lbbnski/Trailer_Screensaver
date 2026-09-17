@@ -32,6 +32,13 @@ Linux.
   end up standing in for a trailer.
 - **Configurable resolution cap and multi-monitor behavior** (a different
   trailer per monitor, or the primary monitor only).
+- **A playback-history view** ("View Recently Played Trailers..." in
+  Settings) listing everything the screensaver has shown, so you can open a
+  game's store page to look it up, permanently block a specific game from
+  playing again, or report a played "trailer" that turned out not to be a
+  real game trailer (a movie's trailer, a Let's Play, ...) — writes what the
+  app knows about it to a local file you can share to help improve the
+  filtering.
 - **No idle daemon.** Nothing runs in the background when the screensaver
   isn't active — see [Idle-footprint invariant](docs/ARCHITECTURE.md#idle-footprint-invariant).
 - **Built to add more sources later.** The metadata/catalog layer is a
@@ -111,7 +118,9 @@ resolution cap, multi-monitor mode, mute/hardware-decode toggles, genre
 allow/block-list, maximum age rating, "prefer popular games", a debug log
 overlay toggle (off by default — shows a live tail of the app's log on top
 of the video, for troubleshooting), the IGDB source toggle with its Twitch
-Client ID/Secret fields, and a GOG source toggle (no fields needed).
+Client ID/Secret fields, a GOG source toggle (no fields needed), and a
+"View Recently Played Trailers..." button opening the playback-history
+view described above.
 
 A few settings are config-file-only for now (no UI control yet): trailer
 length cap (`advanced.maxTrailerDurationSeconds`, default 600s), cache TTLs,

@@ -27,6 +27,7 @@ struct TrailerCandidate {
     QString nativeId;   // the source's own id, e.g. a Steam appid as a string
     QString title;
     QString developer;  // empty if unknown; used to disambiguate YouTube-fallback searches
+    QString storeUrl;   // empty if unknown; a page a user can open to look the game up themselves
 
     QStringList canonicalGenres;
     int ageRating = 0;                  // normalized minimum-age cutoff, e.g. Steam's required_age

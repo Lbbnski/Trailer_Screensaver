@@ -36,4 +36,13 @@ QString debugOverlayFlagPath();
 // read/parsed on its own without wading through ordinary log lines.
 QString youtubeDiagnosticsLogPath();
 
+// Same directory family: a JSON-Lines file of trailers the user flagged as
+// not actually a game trailer from the playback-history view (see
+// qtui/src/PlaybackHistoryDialog.h) — one appendDiagnosticRecord() call per
+// report, meant to be read by a developer (attach/paste its contents) to
+// improve the movie/Let's-Play filtering, the same role
+// youtubeDiagnosticsLogPath() plays for automatic diagnostics but for
+// explicit user reports instead.
+QString reportedTrailersLogPath();
+
 } // namespace ssv::ConfigPaths

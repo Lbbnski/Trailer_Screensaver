@@ -73,6 +73,12 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
            ))",
         R"(CREATE INDEX IF NOT EXISTS idx_playback_history_played_at
              ON playback_history(played_at))",
+        R"(CREATE TABLE IF NOT EXISTS blocked_games (
+             source_id TEXT NOT NULL,
+             native_id TEXT NOT NULL,
+             blocked_at INTEGER NOT NULL,
+             PRIMARY KEY (source_id, native_id)
+           ))",
     };
 
     for (const auto& sql : statements) {
@@ -113,6 +119,24 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
     // not just on which ones get discovered into the cache in the first
     // place (see PlaylistEngine::buildPlaylist's popularity weighting).
     q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN is_popular INTEGER NOT NULL DEFAULT 0"));
+
+    // A page the user can open to look a game up themselves (Steam/GOG
+    // store page, IGDB's own game page) — surfaced in the playback-history
+    // view (see qtui/src/PlaybackHistoryDialog.h).
+    q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN store_url TEXT"));
+
+    // playback_history started as just enough to drive the no-repeat-window
+    // check (source_id/native_id/played_at). These columns denormalize a
+    // snapshot of what was actually played — title/developer/store_url from
+    // the candidate, video_url from the rendition actually loaded — so the
+    // playback-history view stays meaningful (readable titles, a working
+    // store link, enough context to report a bad match) even if the
+    // matching `apps` row later expires or gets overwritten with different
+    // data, rather than depending on a join that could go stale or miss.
+    q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN title TEXT"));
+    q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN developer TEXT"));
+    q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN store_url TEXT"));
+    q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN video_url TEXT"));
 
     return true;
 }

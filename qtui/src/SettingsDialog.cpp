@@ -1,5 +1,6 @@
 #include "SettingsDialog.h"
 #include "GenreListModel.h"
+#include "PlaybackHistoryDialog.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -11,6 +12,7 @@
 #include <QLineEdit>
 #include <QListView>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QRadioButton>
 #include <QSlider>
 #include <QSpinBox>
@@ -119,6 +121,14 @@ void SettingsDialog::buildUi()
 
     root->addWidget(sourcesBox);
 
+    // --- History ---
+    auto* historyRow = new QHBoxLayout();
+    auto* historyButton = new QPushButton(tr("View Recently Played Trailers..."), this);
+    connect(historyButton, &QPushButton::clicked, this, &SettingsDialog::onShowHistory);
+    historyRow->addWidget(historyButton);
+    historyRow->addStretch();
+    root->addLayout(historyRow);
+
     // --- Buttons ---
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &SettingsDialog::onAccept);
@@ -198,6 +208,12 @@ void SettingsDialog::onAccept()
     QMessageBox::warning(this, tr("Couldn't save settings"),
                           tr("Settings could not be written to disk. Check that the configuration "
                              "directory is writable and try again."));
+}
+
+void SettingsDialog::onShowHistory()
+{
+    PlaybackHistoryDialog dialog(this);
+    dialog.exec();
 }
 
 } // namespace ssv

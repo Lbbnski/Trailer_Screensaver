@@ -116,6 +116,7 @@ std::optional<TrailerCandidate> SteamAppDetailsClient::fetchDetails(const QStrin
     candidate.sourceId = QStringLiteral("steam");
     candidate.nativeId = appid;
     candidate.title = data.value("name").toString();
+    candidate.storeUrl = QStringLiteral("https://store.steampowered.com/app/%1").arg(appid);
 
     // Used to disambiguate the YouTube-fallback search query (see
     // YoutubeFallbackResolver) — plenty of game titles collide with a

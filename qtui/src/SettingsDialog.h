@@ -33,6 +33,7 @@ public:
 
 private slots:
     void onAccept();
+    void onShowHistory();
 
 private:
     void buildUi();

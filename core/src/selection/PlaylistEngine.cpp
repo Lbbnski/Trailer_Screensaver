@@ -9,6 +9,13 @@ PlaylistEngine::PlaylistEngine(CacheRepository& repo) : m_repo(repo) {}
 
 bool PlaylistEngine::passesFilter(const TrailerCandidate& candidate, const FilterConfig& filter) const
 {
+    // Checked first, ahead of the user's genre/age/descriptor filter: a game
+    // the user explicitly blocked from the playback-history view (see
+    // qtui/src/PlaybackHistoryDialog.h) should never be offered again
+    // regardless of how the rest of the filter is configured.
+    if (m_repo.isGameBlocked(candidate.sourceId, candidate.nativeId))
+        return false;
+
     for (const auto& blocked : filter.blockedContentDescriptors) {
         if (candidate.contentDescriptors.contains(blocked, Qt::CaseInsensitive))
             return false;

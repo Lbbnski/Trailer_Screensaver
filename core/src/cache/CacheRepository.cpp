@@ -68,6 +68,7 @@ TrailerCandidate rowToCandidate(const QSqlQuery& q)
     c.renditions = renditionsFromJson(q.value("renditions_json").toByteArray());
     c.needsFallbackResolution = c.renditions.isEmpty();
     c.discoveredAsPopular = q.value("is_popular").toInt() != 0;
+    c.storeUrl = q.value("store_url").toString();
     return c;
 }
 
@@ -82,15 +83,15 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.prepare(R"(
         INSERT INTO apps (source_id, native_id, title, developer, canonical_genres, age_rating,
                            content_descriptors, renditions_json, has_trailer,
-                           details_fetched_at, details_stale_after, is_popular)
+                           details_fetched_at, details_stale_after, is_popular, store_url)
         VALUES (:source_id, :native_id, :title, :developer, :genres, :age,
-                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after, :is_popular)
+                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after, :is_popular, :store_url)
         ON CONFLICT(source_id, native_id) DO UPDATE SET
             title=excluded.title, developer=excluded.developer, canonical_genres=excluded.canonical_genres,
             age_rating=excluded.age_rating, content_descriptors=excluded.content_descriptors,
             renditions_json=excluded.renditions_json, has_trailer=excluded.has_trailer,
             details_fetched_at=excluded.details_fetched_at, details_stale_after=excluded.details_stale_after,
-            is_popular=MAX(is_popular, excluded.is_popular)
+            is_popular=MAX(is_popular, excluded.is_popular), store_url=excluded.store_url
     )");
     q.bindValue(":source_id", candidate.sourceId);
     q.bindValue(":native_id", candidate.nativeId);
@@ -104,6 +105,7 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.bindValue(":fetched_at", fetchedAtEpoch);
     q.bindValue(":stale_after", staleAfterEpoch);
     q.bindValue(":is_popular", candidate.discoveredAsPopular ? 1 : 0);
+    q.bindValue(":store_url", candidate.storeUrl);
 
     if (!q.exec())
         logError(QStringLiteral("upsertAppDetails failed: %1").arg(q.lastError().text()));
@@ -307,12 +309,19 @@ bool CacheRepository::fallbackRecentlyFailed(const QString& sourceId, const QStr
     return q.exec() && q.next();
 }
 
-void CacheRepository::recordPlayback(const QString& sourceId, const QString& nativeId, qint64 playedAtEpoch)
+void CacheRepository::recordPlayback(const QString& sourceId, const QString& nativeId,
+                                      const QString& title, const QString& developer, const QString& storeUrl,
+                                      const QString& videoUrl, qint64 playedAtEpoch)
 {
     QSqlQuery q(m_db.handle());
-    q.prepare("INSERT INTO playback_history (source_id, native_id, played_at) VALUES (:s, :n, :t)");
+    q.prepare(R"(INSERT INTO playback_history (source_id, native_id, title, developer, store_url, video_url, played_at)
+                 VALUES (:s, :n, :title, :dev, :store, :video, :t))");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
+    q.bindValue(":title", title);
+    q.bindValue(":dev", developer);
+    q.bindValue(":store", storeUrl);
+    q.bindValue(":video", videoUrl);
     q.bindValue(":t", playedAtEpoch);
     if (!q.exec())
         logError(QStringLiteral("recordPlayback failed: %1").arg(q.lastError().text()));
@@ -335,6 +344,83 @@ void CacheRepository::pruneHistoryOlderThan(qint64 cutoffEpoch)
     q.bindValue(":cutoff", cutoffEpoch);
     if (!q.exec())
         logError(QStringLiteral("pruneHistoryOlderThan failed: %1").arg(q.lastError().text()));
+}
+
+QList<CacheRepository::PlaybackHistoryEntry> CacheRepository::recentPlaybackHistory(int limit) const
+{
+    QList<PlaybackHistoryEntry> out;
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(
+        SELECT h.source_id, h.native_id, h.title, h.developer, h.store_url, h.video_url, h.played_at,
+               CASE WHEN b.source_id IS NULL THEN 0 ELSE 1 END AS blocked
+        FROM playback_history h
+        LEFT JOIN blocked_games b ON b.source_id = h.source_id AND b.native_id = h.native_id
+        ORDER BY h.played_at DESC
+        LIMIT :limit
+    )");
+    q.bindValue(":limit", limit);
+    if (!q.exec()) {
+        logError(QStringLiteral("recentPlaybackHistory query failed: %1").arg(q.lastError().text()));
+        return out;
+    }
+    while (q.next()) {
+        PlaybackHistoryEntry e;
+        e.sourceId = q.value(0).toString();
+        e.nativeId = q.value(1).toString();
+        e.title = q.value(2).toString();
+        e.developer = q.value(3).toString();
+        e.storeUrl = q.value(4).toString();
+        e.videoUrl = q.value(5).toString();
+        e.playedAt = q.value(6).toLongLong();
+        e.blocked = q.value(7).toInt() != 0;
+        out.append(e);
+    }
+    return out;
+}
+
+void CacheRepository::blockGame(const QString& sourceId, const QString& nativeId, qint64 blockedAtEpoch)
+{
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(
+        INSERT INTO blocked_games (source_id, native_id, blocked_at) VALUES (:s, :n, :t)
+        ON CONFLICT(source_id, native_id) DO UPDATE SET blocked_at=excluded.blocked_at
+    )");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    q.bindValue(":t", blockedAtEpoch);
+    if (!q.exec())
+        logError(QStringLiteral("blockGame failed: %1").arg(q.lastError().text()));
+}
+
+void CacheRepository::unblockGame(const QString& sourceId, const QString& nativeId)
+{
+    QSqlQuery q(m_db.handle());
+    q.prepare("DELETE FROM blocked_games WHERE source_id = :s AND native_id = :n");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    if (!q.exec())
+        logError(QStringLiteral("unblockGame failed: %1").arg(q.lastError().text()));
+}
+
+bool CacheRepository::isGameBlocked(const QString& sourceId, const QString& nativeId) const
+{
+    QSqlQuery q(m_db.handle());
+    q.prepare("SELECT 1 FROM blocked_games WHERE source_id = :s AND native_id = :n");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    return q.exec() && q.next();
+}
+
+std::optional<QString> CacheRepository::fallbackQueryUsed(const QString& sourceId, const QString& nativeId) const
+{
+    QSqlQuery q(m_db.handle());
+    q.prepare("SELECT query_used FROM fallback_trailers WHERE source_id = :s AND native_id = :n");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":n", nativeId);
+    if (!q.exec() || !q.next())
+        return std::nullopt;
+    const auto query = q.value(0).toString();
+    return query.isEmpty() ? std::nullopt : std::make_optional(query);
 }
 
 } // namespace ssv

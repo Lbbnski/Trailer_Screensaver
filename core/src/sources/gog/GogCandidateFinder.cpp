@@ -79,6 +79,9 @@ QStringList GogCandidateFinder::fetchPage(const QString& categoryParam, const QS
         candidate.nativeId = nativeId;
         candidate.title = item.value("title").toString();
         candidate.developer = item.value("developer").toString();
+        const auto relativeUrl = item.value("url").toString();
+        if (!relativeUrl.isEmpty())
+            candidate.storeUrl = QStringLiteral("https://www.gog.com") + relativeUrl;
         for (const auto& g : item.value("genres").toArray())
             candidate.canonicalGenres << GogGenreMap::toCanonical(g.toString());
         candidate.canonicalGenres.removeDuplicates();

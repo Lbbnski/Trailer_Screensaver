@@ -9,6 +9,8 @@ add_library(ssvsettingsui STATIC
   src/GenreListModel.cpp
   src/SettingsDialog.h
   src/SettingsDialog.cpp
+  src/PlaybackHistoryDialog.h
+  src/PlaybackHistoryDialog.cpp
   src/PlaybackSession.h
   src/PlaybackSession.cpp
 )

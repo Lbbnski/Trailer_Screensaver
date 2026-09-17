@@ -75,10 +75,52 @@ public:
     // resolution (see TrailerResolver::ensurePlayable / PlaylistEngine::buildPlaylist).
     bool fallbackRecentlyFailed(const QString& sourceId, const QString& nativeId, qint64 nowEpoch) const;
 
-    // --- playback_history: small ring buffer to avoid immediate repeats ---
-    void recordPlayback(const QString& sourceId, const QString& nativeId, qint64 playedAtEpoch);
+    // --- playback_history: also doubles as the user-facing "what have I
+    // seen" list (see qtui/src/PlaybackHistoryDialog.h) ---
+    void recordPlayback(const QString& sourceId, const QString& nativeId,
+                         const QString& title, const QString& developer, const QString& storeUrl,
+                         const QString& videoUrl, qint64 playedAtEpoch);
     bool playedSince(const QString& sourceId, const QString& nativeId, qint64 sinceEpoch) const;
+
+    // Not called anywhere today — playback_history is left to grow
+    // unbounded, which is what makes it usable as a full "everything I've
+    // ever seen" history rather than just a short no-repeat window. Kept
+    // available for a future cap if the table's size ever actually becomes
+    // a problem for a real user's cache.
     void pruneHistoryOlderThan(qint64 cutoffEpoch);
+
+    // One played trailer, as shown in the playback-history view. Snapshotted
+    // at play time (see recordPlayback) rather than joined against `apps`
+    // live, so it stays meaningful even after that row goes stale/changes.
+    struct PlaybackHistoryEntry {
+        QString sourceId;
+        QString nativeId;
+        QString title;
+        QString developer;
+        QString storeUrl;
+        QString videoUrl;
+        qint64 playedAt = 0;
+        bool blocked = false;
+    };
+
+    // Most recent plays first, capped at `limit` — this is a full audit
+    // trail (playback_history is never pruned automatically; see
+    // pruneHistoryOlderThan's own doc), so a generous limit keeps
+    // effectively everything reachable from the UI rather than needing a
+    // separate "manage blocked games" screen.
+    QList<PlaybackHistoryEntry> recentPlaybackHistory(int limit) const;
+
+    // --- blocked_games: games the user never wants offered again ---
+    void blockGame(const QString& sourceId, const QString& nativeId, qint64 blockedAtEpoch);
+    void unblockGame(const QString& sourceId, const QString& nativeId);
+    bool isGameBlocked(const QString& sourceId, const QString& nativeId) const;
+
+    // The YouTube search query that produced a candidate's cached fallback
+    // video, if it was resolved that way — std::nullopt for a candidate
+    // with its own curated trailer, or one never fallback-resolved at all.
+    // Included in a reported-trailer record (see PlaybackHistoryDialog) as
+    // context for why a search might have landed on the wrong video.
+    std::optional<QString> fallbackQueryUsed(const QString& sourceId, const QString& nativeId) const;
 
 private:
     CacheDatabase& m_db;

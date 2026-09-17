@@ -32,6 +32,7 @@ TrailerCandidate parseGame(const QJsonObject& game)
     candidate.sourceId = QStringLiteral("igdb");
     candidate.nativeId = QString::number(game.value("id").toVariant().toLongLong());
     candidate.title = game.value("name").toString();
+    candidate.storeUrl = game.value("url").toString();
 
     // IGDB spreads genre-ish information across three separate vocabularies
     // (see IgdbGenreMap's header comment) — run every label from all three
@@ -154,7 +155,7 @@ QList<QString> IgdbTrailerSource::discoverCandidates(const GenreFilter& filter, 
 std::optional<TrailerCandidate> IgdbTrailerSource::fetchDetails(const QString& nativeId)
 {
     const QString body = QStringLiteral(
-        "fields name, genres.name, themes.name, game_modes.name, "
+        "fields name, url, genres.name, themes.name, game_modes.name, "
         "age_ratings.rating_category.rating, age_ratings.rating_category.organization.name, "
         "videos.video_id, involved_companies.company.name, involved_companies.developer; "
         "where id = %1;").arg(nativeId);
