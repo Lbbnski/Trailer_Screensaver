@@ -1,6 +1,7 @@
 #include "PlaybackHistoryDialog.h"
 
 #include "config/ConfigPaths.h"
+#include "sources/steam/YoutubeFallbackResolver.h"
 #include "util/Logging.h"
 
 #include <QDateTime>
@@ -188,8 +189,16 @@ void PlaybackHistoryDialog::onReport()
 
     appendDiagnosticRecord(ConfigPaths::reportedTrailersLogPath(), record);
 
+    // Takes effect immediately, not just for whoever reads the report later:
+    // this exact video is never played again (the game itself stays
+    // eligible and simply picks a different trailer).
+    const QString videoId = YoutubeFallbackResolver::videoIdFromUrl(entry->videoUrl);
+    if (!videoId.isEmpty())
+        m_repo->rejectVideo(videoId, QDateTime::currentSecsSinceEpoch());
+
     QMessageBox::information(this, tr("Report Recorded"),
-        tr("Thanks — this has been saved to:\n%1\n\nShare that file to help improve the filtering.")
+        tr("Thanks — this video won't be played again, and the report has been saved to:\n%1\n\n"
+           "Share that file to help improve the filtering.")
             .arg(ConfigPaths::reportedTrailersLogPath()));
 }
 

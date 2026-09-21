@@ -1,5 +1,6 @@
 #include "sources/steam/YoutubeFallbackResolver.h"
 #include "config/ConfigPaths.h"
+#include "sources/steam/TrailerHeuristics.h"
 #include "util/Logging.h"
 #include "util/ProcessRunner.h"
 
@@ -7,9 +8,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
-#include <QSet>
-
-#include <algorithm>
+#include <QUrl>
+#include <QUrlQuery>
 
 namespace ssv {
 
@@ -20,26 +20,6 @@ namespace {
 // this costs nothing extra beyond a slightly larger response to parse.
 constexpr int kResultsToConsider = 5;
 
-// YouTube's own topic category for a video — not present in flat-playlist
-// search results at all (confirmed empirically: the "categories"/"tags"
-// fields are simply empty there), only via a full per-video extraction.
-// These two are the categories a real movie/film trailer with a
-// same-named game reliably lands in — observed directly against a search
-// that mixed both ("Alone in the Dark" returns both the 2005 film's
-// trailer, categorized "Film & Animation", and the actual game's reveal
-// trailer, categorized "Gaming", for the same query). Deliberately a small
-// blocklist rather than an allow-list of "Gaming" only: real game trailers
-// are sometimes categorized "Entertainment" or others by their uploader,
-// and rejecting anything not exactly "Gaming" would throw those out too.
-const QSet<QString>& blockedYoutubeCategories()
-{
-    static const QSet<QString> categories{
-        QStringLiteral("Film & Animation"),
-        QStringLiteral("Movies"),
-    };
-    return categories;
-}
-
 // One extra (full, non-flat) yt-dlp invocation per candidate that already
 // passed the cheap title/duration checks — only run for a result that
 // would otherwise be accepted, so this costs nothing for candidates
@@ -48,10 +28,8 @@ const QSet<QString>& blockedYoutubeCategories()
 // between the search and this call — treated as "unknown, don't block" by
 // the caller, the same "never over-filter on missing data" behavior every
 // other source's mapping table uses for a value it doesn't recognize).
-// Returning the whole object rather than just "categories" is what lets
-// resolveDiagnosticRecord() below log everything yt-dlp knows about a
-// candidate, not only the one field currently used to filter it — see
-// util/Logging.h's appendDiagnosticRecord.
+// Categories/tags/description are only available this way: confirmed
+// empirically that the fast flat-playlist search results leave them empty.
 QJsonObject fetchYoutubeFullInfo(const QString& ytDlpPath, const QString& videoId)
 {
     const QStringList args{
@@ -74,46 +52,17 @@ QStringList toStringList(const QJsonArray& arr)
     return out;
 }
 
-// True if at least half of the game title's non-trivial words show up in
-// the video's own title. Deliberately not an exact/full-title substring
-// match: a real trailer's video title routinely adds "Official Trailer",
-// drops a subtitle, or reorders words, and requiring an exact match would
-// reject plenty of correct results. But requiring *some* real overlap is
-// exactly what filters out an unrelated video or a same-named movie
-// trailer that happens to rank first for the search query.
-bool titleLooksLikeMatch(const QString& gameTitle, const QString& videoTitle)
-{
-    // UseUnicodePropertiesOption so \w covers non-ASCII letters (accented
-    // Latin, CJK, ...) instead of just [A-Za-z0-9_] — otherwise a title
-    // like "细胞战争" (no internal spaces/punctuation at all) would split
-    // into zero words and silently skip this check entirely.
-    static const QRegularExpression wordSplit(QStringLiteral("[^\\w]+"),
-                                                QRegularExpression::UseUnicodePropertiesOption);
-    const QStringList gameWords = gameTitle.toLower().split(wordSplit, Qt::SkipEmptyParts);
-    const QString normVideo = videoTitle.toLower();
-
-    int meaningfulWords = 0;
-    int matched = 0;
-    for (const auto& w : gameWords) {
-        if (w.length() < 3)
-            continue; // skip short/common words that would match almost anything
-        ++meaningfulWords;
-        if (normVideo.contains(w))
-            ++matched;
-    }
-
-    if (meaningfulWords == 0)
-        return true; // title is all short/symbolic words — nothing meaningful to check, don't block
-
-    return matched * 2 >= meaningfulWords;
-}
-
 } // namespace
 
 YoutubeFallbackResolver::YoutubeFallbackResolver(QString ytDlpPath, int maxDurationSeconds)
     : m_ytDlpPath(std::move(ytDlpPath))
     , m_maxDurationSeconds(maxDurationSeconds)
 {
+}
+
+void YoutubeFallbackResolver::setRejectedVideoCheck(std::function<bool(const QString&)> isRejected)
+{
+    m_isVideoRejected = std::move(isRejected);
 }
 
 TrailerRendition YoutubeFallbackResolver::renditionForVideoId(const QString& videoId)
@@ -123,6 +72,14 @@ TrailerRendition YoutubeFallbackResolver::renditionForVideoId(const QString& vid
         0, // resolution capping happens via mpv's ytdl-format at playback time
         QStringLiteral("youtube"),
     };
+}
+
+QString YoutubeFallbackResolver::videoIdFromUrl(const QString& url)
+{
+    const QUrl parsed(url);
+    if (!parsed.host().contains(QStringLiteral("youtube.com"), Qt::CaseInsensitive))
+        return {};
+    return QUrlQuery(parsed).queryItemValue(QStringLiteral("v"));
 }
 
 std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& gameTitle, const QString& developer,
@@ -172,6 +129,19 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
     std::optional<TrailerRendition> accepted;
     QString acceptedId;
 
+    // Records a rejection: the decision string in the diagnostics record is
+    // the specific rule that fired, which is what makes a wrong accept or a
+    // wrongly-rejected real trailer diagnosable after the fact.
+    auto reject = [&](QJsonObject& entry, const QString& decision, const QString& detail = QString()) {
+        entry["decision"] = decision;
+        if (!detail.isEmpty())
+            entry["reasonDetail"] = detail;
+        evaluated.append(entry);
+        logInfo(QStringLiteral("yt-dlp: \"%1\" rejected for \"%2\" (%3%4)")
+                    .arg(entry.value("title").toString(), gameTitle, decision,
+                         detail.isEmpty() ? QString() : QStringLiteral(": ") + detail));
+    };
+
     for (const auto& line : result.stdOut.split('\n')) {
         if (line.trimmed().isEmpty())
             continue;
@@ -185,9 +155,25 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
 
         QJsonObject entry{{"id", id}, {"title", title}, {"duration", obj.value("duration")}};
 
-        if (!titleLooksLikeMatch(gameTitle, title)) {
-            entry["decision"] = "rejected_title";
-            evaluated.append(entry);
+        // Cheap title-only checks first — all free, no extra yt-dlp call.
+        if (m_isVideoRejected && m_isVideoRejected(id)) {
+            reject(entry, QStringLiteral("rejected_reported"));
+            continue;
+        }
+        if (!TrailerHeuristics::titleMatchesGame(gameTitle, title)) {
+            reject(entry, QStringLiteral("rejected_title"));
+            continue;
+        }
+        if (!TrailerHeuristics::hasTrailerWord(title)) {
+            reject(entry, QStringLiteral("rejected_no_trailer_word"));
+            continue;
+        }
+        if (const auto word = TrailerHeuristics::nonTrailerWord(gameTitle, title); !word.isEmpty()) {
+            reject(entry, QStringLiteral("rejected_non_trailer_content"), word);
+            continue;
+        }
+        if (const auto word = TrailerHeuristics::movieWordInTitle(gameTitle, title); !word.isEmpty()) {
+            reject(entry, QStringLiteral("rejected_movie_title"), word);
             continue;
         }
 
@@ -196,36 +182,53 @@ std::optional<TrailerRendition> YoutubeFallbackResolver::resolve(const QString& 
         // actually know exceeds the cap rejects the result.
         const auto durationValue = obj.value("duration");
         if (m_maxDurationSeconds > 0 && durationValue.isDouble() && durationValue.toInt() > m_maxDurationSeconds) {
-            logInfo(QStringLiteral("yt-dlp: \"%1\" is %2s, over the %3s cap — skipping (likely a Let's Play/walkthrough, not a trailer)")
-                        .arg(title).arg(durationValue.toInt()).arg(m_maxDurationSeconds));
-            entry["decision"] = "rejected_duration";
-            evaluated.append(entry);
+            reject(entry, QStringLiteral("rejected_duration"), QString::number(durationValue.toInt()));
             continue;
         }
 
+        // Only now spend the extra full-detail fetch.
         const auto fullInfo = fetchYoutubeFullInfo(m_ytDlpPath, id);
         const auto categories = toStringList(fullInfo.value("categories").toArray());
+        const auto tags = toStringList(fullInfo.value("tags").toArray());
+        const QString description = fullInfo.value("description").toString();
         entry["categories"] = QJsonArray::fromStringList(categories);
-        entry["tags"] = QJsonArray::fromStringList(toStringList(fullInfo.value("tags").toArray()));
+        entry["tags"] = QJsonArray::fromStringList(tags);
         entry["channel"] = fullInfo.value("channel").toString();
         entry["uploader"] = fullInfo.value("uploader").toString();
         entry["viewCount"] = fullInfo.value("view_count");
         entry["uploadDate"] = fullInfo.value("upload_date").toString();
-        entry["description"] = fullInfo.value("description").toString().left(500);
+        entry["description"] = description.left(500);
+        const int ageLimit = fullInfo.value("age_limit").toInt();
+        entry["ageLimit"] = ageLimit;
 
-        bool isBlockedCategory = false;
-        for (const auto& c : categories) {
-            if (blockedYoutubeCategories().contains(c)) {
-                isBlockedCategory = true;
-                break;
-            }
+        // An age-restricted video can't be played at all without a logged-in
+        // YouTube session ("Sign in to confirm your age" — seen in a real
+        // log, where mpv then failed with "unrecognized file format" and the
+        // slot was wasted), and this app has no cookies to offer. Picking one
+        // just produces a dead slot, so treat it as unresolvable and let the
+        // next search result (or a later retry) find a playable one.
+        if (ageLimit >= 18) {
+            reject(entry, QStringLiteral("rejected_age_restricted"), QString::number(ageLimit));
+            continue;
         }
-        if (isBlockedCategory) {
-            logInfo(QStringLiteral("yt-dlp: \"%1\" is categorized \"%2\" on YouTube — skipping "
-                                    "(looks like non-game content, e.g. a movie trailer sharing the game's title)")
-                        .arg(title, categories.join(QStringLiteral(", "))));
-            entry["decision"] = "rejected_category";
-            evaluated.append(entry);
+
+        // A same-named movie's/show's trailer: YouTube's own category says
+        // so, or its description/tags carry film/TV-studio/streaming-service
+        // phrasing. One such signal is enough on a non-Gaming video; on a
+        // Gaming one it takes two, since a real game trailer's description
+        // can legitimately mention a streaming service once.
+        if (TrailerHeuristics::isFilmCategory(categories)) {
+            reject(entry, QStringLiteral("rejected_category"), categories.join(QStringLiteral(", ")));
+            continue;
+        }
+        const QString blob = title + QLatin1Char(' ') + description + QLatin1Char(' ') + tags.join(QLatin1Char(' '));
+        const int movieSignals = TrailerHeuristics::movieSignalCount(description + QLatin1Char(' ') + tags.join(QLatin1Char(' ')));
+        if (movieSignals >= 2 || (movieSignals >= 1 && !categories.contains(QStringLiteral("Gaming")))) {
+            reject(entry, QStringLiteral("rejected_movie_signals"), QString::number(movieSignals));
+            continue;
+        }
+        if (TrailerHeuristics::lacksGameContext(categories, blob)) {
+            reject(entry, QStringLiteral("rejected_not_game_content"), categories.join(QStringLiteral(", ")));
             continue;
         }
 

@@ -21,6 +21,8 @@ add_library(ssvcore STATIC
   src/sources/steam/SteamGenreCandidateFinder.cpp
   src/sources/steam/YoutubeFallbackResolver.h
   src/sources/steam/YoutubeFallbackResolver.cpp
+  src/sources/steam/TrailerHeuristics.h
+  src/sources/steam/TrailerHeuristics.cpp
   src/sources/steam/SteamTrailerSource.h
   src/sources/steam/SteamTrailerSource.cpp
 

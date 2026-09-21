@@ -1,4 +1,5 @@
 #include "trailer/TrailerResolver.h"
+#include "sources/steam/YoutubeFallbackResolver.h"
 #include "util/Logging.h"
 
 #include <QDateTime>
@@ -79,6 +80,18 @@ QList<TrailerCandidate> TrailerResolver::preparePool(const QStringList& enabledS
 
 std::optional<TrailerRendition> TrailerResolver::ensurePlayable(TrailerCandidate& candidate)
 {
+    // A video the user reported as not a game trailer never plays again, no
+    // matter which source it came from (a curated IGDB/GOG video id, a
+    // cached fallback match, ...) — drop it, and if that leaves nothing,
+    // fall through to a fresh fallback resolution below (which itself skips
+    // rejected videos).
+    const auto beforeCount = candidate.renditions.size();
+    candidate.renditions.removeIf([this](const TrailerRendition& r) {
+        return m_repo.isVideoRejected(YoutubeFallbackResolver::videoIdFromUrl(r.url));
+    });
+    if (candidate.renditions.size() != beforeCount)
+        candidate.needsFallbackResolution = candidate.renditions.isEmpty();
+
     if (!candidate.renditions.isEmpty())
         return candidate.renditions.first();
 
@@ -103,11 +116,16 @@ std::optional<TrailerRendition> TrailerResolver::ensurePlayable(TrailerCandidate
         return std::nullopt;
     }
 
+    // Only the in-memory candidate gets the resolved video — deliberately
+    // NOT written back into `apps`. It used to be, and a candidate loaded
+    // from `apps` then arrived with a rendition already attached and never
+    // consulted fallback_trailers again, which is where the
+    // resolver_version check (and the user's rejected-video list) lives:
+    // a stale or reported match kept playing straight out of `apps` for the
+    // whole cache TTL. fallback_trailers is the single source of truth for
+    // a fallback video; resolving it again is one cheap DB lookup.
     candidate.renditions.append(*fallback);
     candidate.needsFallbackResolution = false;
-
-    const qint64 staleAfterSeconds = 21LL * 24 * 3600; // matches default cacheTtlDaysAppDetails; caller-provided TTL not needed for this incremental update
-    m_repo.upsertAppDetails(candidate, /*hasTrailer=*/true, now, now + staleAfterSeconds);
 
     return fallback;
 }

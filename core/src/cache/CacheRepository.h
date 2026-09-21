@@ -30,7 +30,13 @@ public:
     // exactly what happened before this existed: every fallback video id in
     // a real cache had been resolved before the category filter was added,
     // so it never got a chance to reject any of them.
-    static constexpr int kCurrentFallbackResolverVersion = 1;
+    //
+    // Version history: 1 = movie/TV category filter; 2 = TrailerHeuristics
+    // (trailer-word requirement, non-trailer/movie word lists, strict
+    // matching for short titles, film/TV description signals) — added after
+    // a user's bad-trailer reports showed a Halo Infinite commentary video
+    // and same-named movie trailers getting through.
+    static constexpr int kCurrentFallbackResolverVersion = 2;
 
     // --- apps: cached TrailerCandidate details ---
     void upsertAppDetails(const TrailerCandidate& candidate, bool hasTrailer,
@@ -114,6 +120,15 @@ public:
     void blockGame(const QString& sourceId, const QString& nativeId, qint64 blockedAtEpoch);
     void unblockGame(const QString& sourceId, const QString& nativeId);
     bool isGameBlocked(const QString& sourceId, const QString& nativeId) const;
+
+    // --- rejected_videos: YouTube videos the user reported as not a game
+    // trailer. Unlike blockGame() (which drops a whole game), this only bans
+    // one video — the game itself stays eligible and simply re-resolves to a
+    // different one. fallbackVideoId() ignores a cached match that's been
+    // rejected, and TrailerResolver::ensurePlayable() drops a rejected
+    // rendition from any source, not just fallback-resolved ones.
+    void rejectVideo(const QString& videoId, qint64 rejectedAtEpoch);
+    bool isVideoRejected(const QString& videoId) const;
 
     // The YouTube search query that produced a candidate's cached fallback
     // video, if it was resolved that way — std::nullopt for a candidate

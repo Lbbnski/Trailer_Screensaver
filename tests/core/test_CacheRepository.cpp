@@ -2,6 +2,7 @@
 #include "cache/CacheRepository.h"
 
 #include <QSqlQuery>
+#include <QTemporaryDir>
 #include <QtTest/QtTest>
 
 #include <memory>
@@ -26,6 +27,8 @@ private slots:
     void playbackHistoryRecordsSnapshotAndOrdersNewestFirst();
     void blockGameRoundTripsAndCanBeUndone();
     void fallbackQueryUsedRoundTrips();
+    void rejectedVideoIsIgnoredByFallbackCache();
+    void migrationStripsFallbackVideosBakedIntoApps();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -219,6 +222,73 @@ void TestCacheRepository::fallbackQueryUsedRoundTrips()
     const auto query = m_repo->fallbackQueryUsed("steam", "4");
     QVERIFY(query.has_value());
     QCOMPARE(*query, QStringLiteral("some game official trailer"));
+}
+
+void TestCacheRepository::rejectedVideoIsIgnoredByFallbackCache()
+{
+    m_repo->cacheFallbackVideoId("steam", "5", "some game official trailer", "badvid", 5000);
+    QVERIFY(m_repo->fallbackVideoId("steam", "5").has_value());
+    QVERIFY(!m_repo->isVideoRejected("badvid"));
+
+    m_repo->rejectVideo("badvid", 6000);
+
+    QVERIFY(m_repo->isVideoRejected("badvid"));
+    // The cached match is now treated as unresolved, so the game re-resolves
+    // to a different video instead of replaying the reported one.
+    QVERIFY(!m_repo->fallbackVideoId("steam", "5").has_value());
+    // Rejecting one video says nothing about other videos or other games.
+    QVERIFY(!m_repo->isVideoRejected("othervid"));
+}
+
+void TestCacheRepository::migrationStripsFallbackVideosBakedIntoApps()
+{
+    // Reproduces a real cache: a fallback video copied into apps.renditions_json
+    // (which ensurePlayable() used to do) made a candidate arrive with a
+    // rendition attached and skip the versioned fallback_trailers cache
+    // entirely, so a stale/reported match kept playing.
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath("cache.sqlite3");
+
+    {
+        auto db = CacheDatabase::open(path);
+        QVERIFY(db.isOpen());
+        CacheRepository repo(db);
+
+        TrailerCandidate baked;
+        baked.sourceId = "steam";
+        baked.nativeId = "1";
+        baked.renditions.append(TrailerRendition{"https://www.youtube.com/watch?v=fallbackvid", 0, "youtube"});
+        repo.upsertAppDetails(baked, true, 1000, 999999999);
+        repo.cacheFallbackVideoId("steam", "1", "q", "fallbackvid", 1000);
+
+        // An IGDB-style candidate whose youtube video is its own curated
+        // one (no fallback row) must be left alone.
+        TrailerCandidate curated;
+        curated.sourceId = "igdb";
+        curated.nativeId = "2";
+        curated.renditions.append(TrailerRendition{"https://www.youtube.com/watch?v=curatedvid", 0, "youtube"});
+        repo.upsertAppDetails(curated, true, 1000, 999999999);
+
+        // A Steam CDN candidate is untouched too.
+        TrailerCandidate cdn;
+        cdn.sourceId = "steam";
+        cdn.nativeId = "3";
+        cdn.renditions.append(TrailerRendition{"https://cdn.invalid/3.mp4", 0, "mp4"});
+        repo.upsertAppDetails(cdn, true, 1000, 999999999);
+    }
+
+    // Reopening runs the migration again over the populated file.
+    auto reopened = CacheDatabase::open(path);
+    QVERIFY(reopened.isOpen());
+    CacheRepository repo(reopened);
+
+    QVERIFY(repo.getAppDetails("steam", "1")->renditions.isEmpty());
+    QCOMPARE(repo.getAppDetails("igdb", "2")->renditions.size(), 1);
+    QCOMPARE(repo.getAppDetails("steam", "3")->renditions.size(), 1);
+    // ...and the fallback cache itself is untouched, so it can still serve
+    // the video (subject to its own version/rejection checks).
+    QVERIFY(repo.fallbackVideoId("steam", "1").has_value());
 }
 
 QTEST_MAIN(TestCacheRepository)

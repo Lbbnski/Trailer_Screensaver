@@ -106,6 +106,10 @@ bool PlaybackSession::start(std::optional<Config> configOverride)
     // are enabled.
     m_youtubeFallback = std::make_unique<YoutubeFallbackResolver>(
         m_config.advanced.ytDlpPath, m_config.advanced.maxTrailerDurationSeconds);
+    // A video the user reported from the playback-history view is never
+    // picked again for any game.
+    m_youtubeFallback->setRejectedVideoCheck(
+        [repo = m_repo.get()](const QString& videoId) { return repo->isVideoRejected(videoId); });
 
     const qint64 candidateListTtlSeconds = qint64(m_config.advanced.cacheTtlDaysCandidateList) * 24 * 3600;
 

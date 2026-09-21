@@ -79,6 +79,12 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
              blocked_at INTEGER NOT NULL,
              PRIMARY KEY (source_id, native_id)
            ))",
+        // YouTube video ids the user reported as "not a game trailer" — never
+        // played again, for any game (see CacheRepository::rejectVideo).
+        R"(CREATE TABLE IF NOT EXISTS rejected_videos (
+             video_id TEXT NOT NULL PRIMARY KEY,
+             rejected_at INTEGER NOT NULL
+           ))",
     };
 
     for (const auto& sql : statements) {
@@ -137,6 +143,29 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
     q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN developer TEXT"));
     q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN store_url TEXT"));
     q.exec(QStringLiteral("ALTER TABLE playback_history ADD COLUMN video_url TEXT"));
+
+    // TrailerResolver::ensurePlayable() used to copy a resolved fallback
+    // video into apps.renditions_json as well as fallback_trailers. A
+    // candidate loaded from `apps` then arrived with a rendition already
+    // attached and never consulted fallback_trailers — where the
+    // resolver_version check lives — at all, so a stale or since-rejected
+    // match kept playing straight out of `apps` for the full cache TTL
+    // (confirmed on a real cache: two user-reported bad trailers were
+    // still resolver_version 0 in fallback_trailers, yet playing). The
+    // fallback video's only home is fallback_trailers now; strip any copy
+    // still sitting in `apps` so those rows go back through it. Cast to
+    // TEXT because the column holds a BLOB when written from a QByteArray.
+    // A no-op once nothing bakes fallback videos into `apps` anymore, and
+    // harmless to repeat: a stripped row just re-resolves from the cache.
+    q.exec(QStringLiteral(R"(
+        UPDATE apps SET renditions_json = '[]'
+        WHERE EXISTS (
+            SELECT 1 FROM fallback_trailers f
+            WHERE f.source_id = apps.source_id AND f.native_id = apps.native_id
+              AND f.video_id IS NOT NULL AND f.video_id <> ''
+              AND instr(CAST(apps.renditions_json AS TEXT), f.video_id) > 0
+        )
+    )"));
 
     return true;
 }

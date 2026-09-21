@@ -26,10 +26,16 @@ Linux.
   lists).
 - **Quality-checked YouTube fallback**: the search query is disambiguated
   with the game's developer name (so a same-named movie or unrelated video
-  doesn't win), several results are checked against the game's actual
-  title, and anything longer than a configurable cap (10 minutes by
-  default) is rejected — so a stray Let's Play or full walkthrough doesn't
-  end up standing in for a trailer.
+  doesn't win), and each of several results must pass a stack of checks
+  before it can stand in for a trailer — its title names the game (in full
+  for a short title, so "Gun Beat" can't match *Top Gun: Maverick*) and
+  contains a trailer/announcement word, with no review/reaction/
+  breakdown/interview/movie wording; it's under a length cap (10 minutes
+  by default), isn't age-restricted (which can't play without a YouTube
+  login), isn't categorized as film/TV or described with film-studio or
+  streaming-service phrasing, and hasn't been reported by you. Every
+  decision, with the specific rule behind it, is logged to
+  `youtube_candidates.jsonl` for troubleshooting.
 - **Configurable resolution cap and multi-monitor behavior** (a different
   trailer per monitor, or the primary monitor only).
 - **A playback-history view** ("View Recently Played Trailers..." in

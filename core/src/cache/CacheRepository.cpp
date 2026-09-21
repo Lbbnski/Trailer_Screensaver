@@ -254,7 +254,9 @@ void CacheRepository::cacheFallbackVideoId(const QString& sourceId, const QStrin
 std::optional<QString> CacheRepository::fallbackVideoId(const QString& sourceId, const QString& nativeId) const
 {
     QSqlQuery q(m_db.handle());
-    q.prepare("SELECT video_id FROM fallback_trailers WHERE source_id = :s AND native_id = :n AND resolver_version >= :ver");
+    q.prepare(R"(SELECT video_id FROM fallback_trailers
+                 WHERE source_id = :s AND native_id = :n AND resolver_version >= :ver
+                   AND video_id NOT IN (SELECT video_id FROM rejected_videos))");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
     q.bindValue(":ver", kCurrentFallbackResolverVersion);
@@ -408,6 +410,31 @@ bool CacheRepository::isGameBlocked(const QString& sourceId, const QString& nati
     q.prepare("SELECT 1 FROM blocked_games WHERE source_id = :s AND native_id = :n");
     q.bindValue(":s", sourceId);
     q.bindValue(":n", nativeId);
+    return q.exec() && q.next();
+}
+
+void CacheRepository::rejectVideo(const QString& videoId, qint64 rejectedAtEpoch)
+{
+    if (videoId.isEmpty())
+        return;
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(
+        INSERT INTO rejected_videos (video_id, rejected_at) VALUES (:v, :t)
+        ON CONFLICT(video_id) DO UPDATE SET rejected_at=excluded.rejected_at
+    )");
+    q.bindValue(":v", videoId);
+    q.bindValue(":t", rejectedAtEpoch);
+    if (!q.exec())
+        logError(QStringLiteral("rejectVideo failed: %1").arg(q.lastError().text()));
+}
+
+bool CacheRepository::isVideoRejected(const QString& videoId) const
+{
+    if (videoId.isEmpty())
+        return false;
+    QSqlQuery q(m_db.handle());
+    q.prepare("SELECT 1 FROM rejected_videos WHERE video_id = :v");
+    q.bindValue(":v", videoId);
     return q.exec() && q.next();
 }
 

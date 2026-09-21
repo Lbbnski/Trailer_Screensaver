@@ -41,6 +41,23 @@
   playback. `advanced.ytDlpPath` is configurable so a self-updated system
   install of yt-dlp can be used independent of whatever ships with the app.
 
+- **YouTube-fallback matching is heuristic and will occasionally pick the
+  wrong video** — the rules (`TrailerHeuristics`) were tuned against real
+  diagnostics logs and user reports, and trade recall for precision on
+  purpose: a fallback that can't find a clearly-a-trailer video is skipped
+  rather than guessed at (roughly a fifth of previously-accepted results in
+  the calibration data would be dropped, nearly all of them fan/streamer
+  uploads or OSTs). Known gaps: a *different game* whose title merely
+  extends the real one ("Arsonist" vs "Arsonist Heaven") still passes, since
+  telling them apart needs a game database rather than text rules, and a
+  real trailer with no trailer-ish word in its title (e.g. only "Official
+  Gameplay Video" wording we don't recognize) is dropped. Report a bad one
+  from Settings → View Recently Played Trailers: that video is never played
+  again, and the report (with the exact rule that accepted it, from
+  `youtube_candidates.jsonl`) is what drives the next tuning pass. The
+  fallback cache is versioned (`CacheRepository::kCurrentFallbackResolverVersion`),
+  so tightening a rule re-evaluates every previously cached match.
+
 - **Steam's age-gate cookie approach may not be bulletproof for
   Adults-Only-Sexual-Content titles specifically** — some titles impose
   additional server-side checks beyond the standard age-gate cookies. Any
