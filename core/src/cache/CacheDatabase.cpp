@@ -173,6 +173,20 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
         )
     )"));
 
+    // Steam stopped listing mp4/webm trailers in appdetails (only HLS/DASH
+    // now), so every Steam row cached before the parser learned those has an
+    // empty rendition list and would keep routing through the YouTube
+    // fallback for the rest of its TTL. Expire them once so they re-fetch.
+    // Gated on user_version so legitimately trailer-less games are not
+    // re-fetched on every start.
+    q.exec(QStringLiteral("PRAGMA user_version"));
+    const int schemaVersion = q.next() ? q.value(0).toInt() : 0;
+    q.finish();
+    if (schemaVersion < 1) {
+        q.exec(QStringLiteral("UPDATE apps SET details_stale_after = 0 WHERE source_id = 'steam'"));
+        q.exec(QStringLiteral("PRAGMA user_version = 1"));
+    }
+
     return true;
 }
 

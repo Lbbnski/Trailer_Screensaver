@@ -164,6 +164,13 @@
   details fetched; each run drains a limited batch. Many unreleased games
   have no trailer of their own and go through the YouTube fallback.
 
+- **YouTube can refuse yt-dlp with "Sign in to confirm you're not a bot".**
+  Steam-hosted trailers are unaffected, but YouTube-fallback, GOG and IGDB
+  trailers then fail to play until YouTube stops flagging the connection
+  (or yt-dlp is given browser cookies, which this app does not do).
+  Steam trailers are adaptive HLS streams, so the 480p resolution cap
+  only applies to YouTube trailers.
+
 - **Epic Games Store was evaluated and deliberately not implemented.**
   Epic's storefront GraphQL endpoint (`store.epicgames.com/graphql`)
   returned `403 Forbidden` to plain HTTP requests from two independent

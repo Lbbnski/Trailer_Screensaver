@@ -68,6 +68,15 @@ QList<TrailerRendition> parseMovies(const QJsonArray& movies)
     addIfPresent(webm, "max", 0, QStringLiteral("webm"));
     addIfPresent(webm, "480", 480, QStringLiteral("webm"));
 
+    // Steam dropped the mp4/webm entries from appdetails and now only
+    // publishes adaptive streams, so without this every Steam game came back
+    // "no trailer" and went through the (bot-blockable) YouTube fallback.
+    // HLS is what mpv/ffmpeg handle most reliably; DASH is kept as a second
+    // choice. The stream is adaptive, so there is no separate 480p variant to
+    // pick — the resolution cap only applies to YouTube trailers.
+    addIfPresent(chosen, "hls_h264", 0, QStringLiteral("hls"));
+    addIfPresent(chosen, "dash_h264", 0, QStringLiteral("dash"));
+
     return renditions;
 }
 
