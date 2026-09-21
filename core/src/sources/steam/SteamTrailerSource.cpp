@@ -48,6 +48,15 @@ QList<QString> SteamTrailerSource::discoverCandidates(const GenreFilter& filter,
     QStringList discovered;
     int remaining = requestBudget;
 
+    // "Only upcoming games": released games can't satisfy the filter, so
+    // spend the whole budget on the unreleased list rather than genre/
+    // popular/new-release discovery whose results would all be filtered out.
+    if (filter.upcoming == UpcomingMode::OnlyUpcoming) {
+        discovered << m_candidateFinder.upcoming(requestBudget, kOnlyUpcomingIdsPerRun, m_repo, m_candidateListTtlSeconds);
+        discovered.removeDuplicates();
+        return discovered;
+    }
+
     // Popular titles go first: TrailerResolver::preparePool() detail-fetches
     // newIds in the order discoverCandidates() returns them, so putting
     // these first is what actually makes "prefer popular" bias which apps
@@ -66,6 +75,14 @@ QList<QString> SteamTrailerSource::discoverCandidates(const GenreFilter& filter,
         const int spend = std::min(1, remaining); // one featuredcategories call covers both new_releases and coming_soon
         discovered << m_candidateFinder.newAndTrending(spend, m_repo, m_candidateListTtlSeconds);
         remaining -= spend;
+    }
+
+    // A steady small share of unreleased games alongside everything else
+    // (unless the user chose to hide them): at most one listing page per TTL
+    // window and a few ids per run, so it can't crowd out genre discovery.
+    if (filter.upcoming == UpcomingMode::Include && remaining > 0) {
+        discovered << m_candidateFinder.upcoming(1, kMixedInUpcomingIdsPerRun, m_repo, m_candidateListTtlSeconds);
+        remaining -= 1;
     }
 
     if (remaining <= 0) {

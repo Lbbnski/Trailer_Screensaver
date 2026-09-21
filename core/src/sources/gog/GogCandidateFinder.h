@@ -48,6 +48,13 @@ public:
     // topPlayed()'s "__popular__".
     QStringList newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
+    // Unreleased games: walks the date-sorted listing (upcoming items come
+    // first — verified live) up to `requestBudget` pages, keeps the ones
+    // GOG flags isComingSoon, records them under "__upcoming__" and flags
+    // them in the cache, and returns up to `maxIds` that still lack details.
+    // Not TTL-gated — see the .cpp for why each call re-fetches its pages.
+    QStringList upcoming(int requestBudget, int maxIds, CacheRepository& repo);
+
     // Metadata (everything but videos) for a native id discovered by the
     // most recent discover()/topPlayed() call on this instance. Empty
     // (default-constructed) TrailerCandidate if the id wasn't just

@@ -68,11 +68,16 @@ QList<TrailerCandidate> TrailerResolver::preparePool(const QStringList& enabledS
 
                 const bool hasTrailer = !details->renditions.isEmpty();
                 m_repo.upsertAppDetails(*details, hasTrailer, now, now + staleAfterSeconds);
-                fresh.append(*details);
             }
         }
 
-        pool << fresh;
+        // Re-read after discovery instead of appending to what was loaded
+        // before it: discovery can change already-cached rows (upcoming
+        // discovery flags them via CacheRepository::markComingSoon), and the
+        // pre-discovery copy would hand PlaylistEngine stale flags for this
+        // whole run — e.g. an "only upcoming games" playlist that comes up
+        // empty on the very run that just found the upcoming games.
+        pool << m_repo.freshAppDetails(sourceId, now);
     }
 
     return pool;

@@ -13,6 +13,7 @@ constexpr int kSearchPageSize = 200; // IGDB allows up to 500 per request; keep 
 const QString kSourceId = QStringLiteral("igdb");
 const QString kPopularPseudoGenre = QStringLiteral("__popular__"); // matches SteamGenreCandidateFinder's convention
 const QString kRecentPseudoGenre = QStringLiteral("__recent__");
+const QString kUpcomingPseudoGenre = QStringLiteral("__upcoming__");
 }
 
 IgdbCandidateFinder::IgdbCandidateFinder(IgdbClient& client) : m_client(client) {}
@@ -120,21 +121,14 @@ QStringList IgdbCandidateFinder::newAndTrending(int requestBudget, CacheReposito
     if ((now - state.lastRefreshedAt) <= candidateListTtlSeconds)
         return {};
 
-    QStringList discovered;
-    int remaining = requestBudget;
+    // Already-released games from roughly the last 90 days, ranked by rating
+    // count as a "currently being talked about" proxy. (Unreleased games have
+    // their own list — see upcoming().)
     bool hasMore = false;
-
-    if (remaining > 0) {
-        discovered << searchPageSorted(QStringLiteral("first_release_date > %1 & hypes > 0").arg(now),
-                                        QStringLiteral("hypes"), 0, kSearchPageSize, &hasMore);
-        --remaining;
-    }
-    if (remaining > 0) {
-        const qint64 ninetyDaysAgo = now - 90LL * 24 * 3600;
-        discovered << searchPage(QStringLiteral("first_release_date <= %1 & first_release_date > %2").arg(now).arg(ninetyDaysAgo),
-                                  0, kSearchPageSize, &hasMore);
-        --remaining;
-    }
+    const qint64 ninetyDaysAgo = now - 90LL * 24 * 3600;
+    QStringList discovered = searchPage(
+        QStringLiteral("first_release_date <= %1 & first_release_date > %2").arg(now).arg(ninetyDaysAgo),
+        0, kSearchPageSize, &hasMore);
     discovered.removeDuplicates();
 
     if (!discovered.isEmpty())
@@ -143,6 +137,35 @@ QStringList IgdbCandidateFinder::newAndTrending(int requestBudget, CacheReposito
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(kSourceId, kRecentPseudoGenre, state);
     return discovered;
+}
+
+QStringList IgdbCandidateFinder::upcoming(int requestBudget, int maxIds, CacheRepository& repo, qint64 candidateListTtlSeconds)
+{
+    if (requestBudget <= 0 || maxIds <= 0)
+        return {};
+
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    auto state = repo.candidatePageState(kSourceId, kUpcomingPseudoGenre);
+
+    // One request re-lists it, at most once per TTL window.
+    if ((now - state.lastRefreshedAt) > candidateListTtlSeconds) {
+        bool hasMore = false;
+        // Ranked by IGDB's community-anticipation signal ("hypes" — the same
+        // sort its own "Most Anticipated" page uses); total_rating_count is
+        // useless for an unreleased game, which has no ratings yet.
+        QStringList listed = searchPageSorted(QStringLiteral("first_release_date > %1 & hypes > 0").arg(now),
+                                               QStringLiteral("hypes"), 0, kSearchPageSize, &hasMore);
+        listed.removeDuplicates();
+
+        if (!listed.isEmpty()) {
+            repo.addGenreCandidates(kSourceId, kUpcomingPseudoGenre, listed, now);
+            repo.markComingSoon(kSourceId, listed);
+            state.lastRefreshedAt = now;
+            repo.setCandidatePageState(kSourceId, kUpcomingPseudoGenre, state);
+        }
+    }
+
+    return repo.unfetchedCandidates(kSourceId, kUpcomingPseudoGenre, now, maxIds);
 }
 
 } // namespace ssv

@@ -44,6 +44,22 @@ public:
     std::optional<TrailerCandidate> getAppDetails(const QString& sourceId, const QString& nativeId) const;
     bool hasFreshDetails(const QString& sourceId, const QString& nativeId, qint64 nowEpoch) const;
 
+    // Flags already-cached rows as unreleased. Upcoming discovery knows from
+    // the *list* an id came from (Steam's coming-soon search, IGDB's
+    // future-dated query) that it's unreleased, so it can mark rows fetched
+    // before this flag existed right away instead of waiting out their
+    // details TTL. Rows not cached yet are simply skipped — their own
+    // details fetch sets the flag.
+    void markComingSoon(const QString& sourceId, const QStringList& nativeIds);
+
+    // Ids recorded under `genre` (a real genre or a "__pseudo__" list key)
+    // that have no fresh details yet, up to `limit`. Discovery returns a
+    // whole list's ids at once but TrailerResolver only detail-fetches a
+    // small budget per run, so ids beyond it were previously dropped until
+    // the list was next re-listed; this lets a list drain across runs.
+    QStringList unfetchedCandidates(const QString& sourceId, const QString& genre,
+                                     qint64 nowEpoch, int limit) const;
+
     // All cached candidates for a source that are not stale as of nowEpoch.
     // PlaylistEngine applies genre/age filtering on top of this — the cache
     // layer doesn't know about the user's filter settings.

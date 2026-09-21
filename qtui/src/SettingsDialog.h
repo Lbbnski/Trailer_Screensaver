@@ -52,6 +52,7 @@ private:
     QSlider* m_maxAgeSlider = nullptr;
     QSpinBox* m_maxAgeSpin = nullptr;
     QCheckBox* m_preferPopularCheck = nullptr;
+    QComboBox* m_upcomingCombo = nullptr;
 
     QCheckBox* m_steamSourceCheck = nullptr; // always enabled; kept as a checkbox for symmetry with future sources
 

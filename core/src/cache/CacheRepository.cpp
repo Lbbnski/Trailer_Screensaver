@@ -69,6 +69,7 @@ TrailerCandidate rowToCandidate(const QSqlQuery& q)
     c.needsFallbackResolution = c.renditions.isEmpty();
     c.discoveredAsPopular = q.value("is_popular").toInt() != 0;
     c.storeUrl = q.value("store_url").toString();
+    c.comingSoon = q.value("coming_soon").toInt() != 0;
     return c;
 }
 
@@ -83,15 +84,17 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.prepare(R"(
         INSERT INTO apps (source_id, native_id, title, developer, canonical_genres, age_rating,
                            content_descriptors, renditions_json, has_trailer,
-                           details_fetched_at, details_stale_after, is_popular, store_url)
+                           details_fetched_at, details_stale_after, is_popular, store_url, coming_soon)
         VALUES (:source_id, :native_id, :title, :developer, :genres, :age,
-                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after, :is_popular, :store_url)
+                :descriptors, :renditions, :has_trailer, :fetched_at, :stale_after, :is_popular, :store_url,
+                :coming_soon)
         ON CONFLICT(source_id, native_id) DO UPDATE SET
             title=excluded.title, developer=excluded.developer, canonical_genres=excluded.canonical_genres,
             age_rating=excluded.age_rating, content_descriptors=excluded.content_descriptors,
             renditions_json=excluded.renditions_json, has_trailer=excluded.has_trailer,
             details_fetched_at=excluded.details_fetched_at, details_stale_after=excluded.details_stale_after,
-            is_popular=MAX(is_popular, excluded.is_popular), store_url=excluded.store_url
+            is_popular=MAX(is_popular, excluded.is_popular), store_url=excluded.store_url,
+            coming_soon=excluded.coming_soon
     )");
     q.bindValue(":source_id", candidate.sourceId);
     q.bindValue(":native_id", candidate.nativeId);
@@ -106,9 +109,57 @@ void CacheRepository::upsertAppDetails(const TrailerCandidate& candidate, bool h
     q.bindValue(":stale_after", staleAfterEpoch);
     q.bindValue(":is_popular", candidate.discoveredAsPopular ? 1 : 0);
     q.bindValue(":store_url", candidate.storeUrl);
+    q.bindValue(":coming_soon", candidate.comingSoon ? 1 : 0);
 
     if (!q.exec())
         logError(QStringLiteral("upsertAppDetails failed: %1").arg(q.lastError().text()));
+}
+
+void CacheRepository::markComingSoon(const QString& sourceId, const QStringList& nativeIds)
+{
+    if (nativeIds.isEmpty())
+        return;
+
+    QSqlDatabase db = m_db.handle();
+    const bool ownTransaction = db.transaction();
+
+    QSqlQuery q(db);
+    q.prepare("UPDATE apps SET coming_soon = 1 WHERE source_id = :s AND native_id = :n");
+    for (const auto& nativeId : nativeIds) {
+        q.bindValue(":s", sourceId);
+        q.bindValue(":n", nativeId);
+        if (!q.exec())
+            logError(QStringLiteral("markComingSoon failed: %1").arg(q.lastError().text()));
+    }
+
+    if (ownTransaction)
+        db.commit();
+}
+
+QStringList CacheRepository::unfetchedCandidates(const QString& sourceId, const QString& genre,
+                                                  qint64 nowEpoch, int limit) const
+{
+    QStringList out;
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(
+        SELECT g.native_id FROM genre_candidates g
+        WHERE g.source_id = :s AND g.genre = :g
+          AND NOT EXISTS (SELECT 1 FROM apps a
+                          WHERE a.source_id = g.source_id AND a.native_id = g.native_id
+                            AND a.details_stale_after > :now)
+        LIMIT :limit
+    )");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":g", genre);
+    q.bindValue(":now", nowEpoch);
+    q.bindValue(":limit", limit);
+    if (!q.exec()) {
+        logError(QStringLiteral("unfetchedCandidates failed: %1").arg(q.lastError().text()));
+        return out;
+    }
+    while (q.next())
+        out << q.value(0).toString();
+    return out;
 }
 
 std::optional<TrailerCandidate> CacheRepository::getAppDetails(const QString& sourceId, const QString& nativeId) const

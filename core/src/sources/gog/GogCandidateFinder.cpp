@@ -22,6 +22,7 @@ constexpr int kPageSize = 48; // embed.gog.com's own page size, observed directl
 const QString kSourceId = QStringLiteral("gog");
 const QString kPopularPseudoGenre = QStringLiteral("__popular__");
 const QString kRecentPseudoGenre = QStringLiteral("__recent__");
+const QString kUpcomingPseudoGenre = QStringLiteral("__upcoming__");
 } // namespace
 
 GogCandidateFinder::GogCandidateFinder(QNetworkAccessManager& networkManager)
@@ -90,6 +91,10 @@ QStringList GogCandidateFinder::fetchPage(const QString& categoryParam, const QS
         // rating-board methodology behind this single number isn't
         // documented; worst case a slightly-off cutoff, never a crash.
         candidate.ageRating = item.value("ageLimit").toVariant().toInt();
+        // Verified live: isComingSoon is true for exactly the items whose
+        // releaseDate is in the future (22 of 22 on the first date-sorted
+        // page), so it's a reliable unreleased marker.
+        candidate.comingSoon = item.value("isComingSoon").toBool();
         // needsFallbackResolution stays true (default) — videos aren't in
         // this response at all, only GogTrailerSource::fetchDetails() (a
         // separate per-id request) can fill renditions in.
@@ -196,6 +201,51 @@ QStringList GogCandidateFinder::newAndTrending(int requestBudget, CacheRepositor
     state.lastRefreshedAt = now;
     repo.setCandidatePageState(kSourceId, kRecentPseudoGenre, state);
     return ids;
+}
+
+QStringList GogCandidateFinder::upcoming(int requestBudget, int maxIds, CacheRepository& repo)
+{
+    if (requestBudget <= 0 || maxIds <= 0)
+        return {};
+
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+
+    // Listing pages are re-fetched on every call rather than TTL-gated like
+    // the other sources' lists: GogTrailerSource::fetchDetails() depends on
+    // this instance's in-memory pendingMetadata (a listing page carries the
+    // genres/age/developer that the per-id product endpoint doesn't repeat),
+    // so an id can only be detail-fetched in the same run its page was
+    // fetched. That's one request per call in mix-in mode.
+    QStringList upcomingIds;
+    for (int page = 1; page <= requestBudget; ++page) {
+        bool hasMore = false;
+        const auto ids = fetchPage(QString(), QStringLiteral("date"), page, &hasMore);
+        int upcomingOnPage = 0;
+        for (const auto& id : ids) {
+            if (m_pendingMetadata.value(id).comingSoon) {
+                upcomingIds << id;
+                ++upcomingOnPage;
+            }
+        }
+        // date-sorted, so once a page has no unreleased items we're past them.
+        if (!hasMore || upcomingOnPage == 0)
+            break;
+    }
+    upcomingIds.removeDuplicates();
+
+    if (!upcomingIds.isEmpty()) {
+        repo.addGenreCandidates(kSourceId, kUpcomingPseudoGenre, upcomingIds, now);
+        repo.markComingSoon(kSourceId, upcomingIds);
+    }
+
+    QStringList unfetched;
+    for (const auto& id : upcomingIds) {
+        if (unfetched.size() >= maxIds)
+            break;
+        if (!repo.hasFreshDetails(kSourceId, id, now))
+            unfetched << id;
+    }
+    return unfetched;
 }
 
 } // namespace ssv

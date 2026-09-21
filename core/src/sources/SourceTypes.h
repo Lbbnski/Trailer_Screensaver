@@ -17,6 +17,22 @@ struct TrailerRendition {
     QString container; // "webm", "mp4", "youtube"
 };
 
+// How unreleased ("coming soon") games are treated — see
+// TrailerCandidate::comingSoon and FilterConfig::upcomingMode.
+enum class UpcomingMode {
+    Include,       // mixed in with everything else (the default)
+    OnlyUpcoming,  // only unreleased games
+    Exclude,       // never unreleased games
+};
+
+// How many not-yet-fetched upcoming ids a source's discoverCandidates() hands
+// back per run. TrailerResolver detail-fetches only a small budget per run,
+// so in the default mix-in mode this stays small enough not to crowd out
+// genre discovery, while "only upcoming" mode has nothing else to spend the
+// budget on and asks for as many as the detail budget could use.
+constexpr int kMixedInUpcomingIdsPerRun = 4;
+constexpr int kOnlyUpcomingIdsPerRun = 60;
+
 // A game/trailer candidate normalized to a common shape so PlaylistEngine,
 // the cache, and playback never need to know which IMetadataSource produced
 // it. Genre and age fields are expressed in the canonical taxonomy (see
@@ -42,6 +58,14 @@ struct TrailerCandidate {
     // — used by PlaylistEngine to actually give GenreFilter::preferPopular an
     // effect on playback, not just on discovery order.
     bool discoveredAsPopular = false;
+
+    // True while the game hasn't been released yet, as of the last time its
+    // details were fetched (Steam's appdetails release_date.coming_soon,
+    // GOG's isComingSoon, IGDB's first_release_date in the future). Unlike
+    // discoveredAsPopular this is *not* sticky — a refresh overwrites it, so
+    // a game drops out of "upcoming" once its details are re-fetched after
+    // release (up to the details cache TTL later; see docs/LIMITATIONS.md).
+    bool comingSoon = false;
 };
 
 // What the user's genre filter setting selects.
@@ -56,6 +80,12 @@ struct GenreFilter {
     // exclusionary filter — a source that doesn't support it just ignores
     // this flag.
     bool preferPopular = false;
+
+    // Steers discovery: OnlyUpcoming spends the whole discovery budget on
+    // unreleased games instead of genre/popular/new-release lists; Exclude
+    // skips upcoming discovery entirely; Include (default) adds a small
+    // share of upcoming discovery alongside the normal kinds.
+    UpcomingMode upcoming = UpcomingMode::Include;
 };
 
 } // namespace ssv

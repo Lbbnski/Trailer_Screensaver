@@ -34,6 +34,12 @@ TrailerCandidate parseGame(const QJsonObject& game)
     candidate.title = game.value("name").toString();
     candidate.storeUrl = game.value("url").toString();
 
+    // Unreleased if IGDB has a release date and it's still in the future.
+    // (No date at all is *not* treated as upcoming: plenty of old/obscure
+    // entries lack one.)
+    const qint64 releaseDate = game.value("first_release_date").toVariant().toLongLong();
+    candidate.comingSoon = releaseDate > QDateTime::currentSecsSinceEpoch();
+
     // IGDB spreads genre-ish information across three separate vocabularies
     // (see IgdbGenreMap's header comment) — run every label from all three
     // through the same map and merge.
@@ -111,6 +117,16 @@ QList<QString> IgdbTrailerSource::discoverCandidates(const GenreFilter& filter, 
     QStringList discovered;
     int remaining = requestBudget;
 
+    if (filter.upcoming == UpcomingMode::OnlyUpcoming) {
+        // Genre/popular/recent discovery would only add released games the
+        // filter throws away again.
+        return m_candidateFinder.upcoming(requestBudget, kOnlyUpcomingIdsPerRun, m_repo, m_candidateListTtlSeconds);
+    }
+    if (filter.upcoming == UpcomingMode::Include && remaining > 0) {
+        discovered << m_candidateFinder.upcoming(1, kMixedInUpcomingIdsPerRun, m_repo, m_candidateListTtlSeconds);
+        remaining -= 1;
+    }
+
     if (filter.preferPopular && remaining > 0) {
         const int spend = std::min(1, remaining);
         discovered << m_candidateFinder.topPlayed(spend, m_repo, m_candidateListTtlSeconds);
@@ -155,7 +171,7 @@ QList<QString> IgdbTrailerSource::discoverCandidates(const GenreFilter& filter, 
 std::optional<TrailerCandidate> IgdbTrailerSource::fetchDetails(const QString& nativeId)
 {
     const QString body = QStringLiteral(
-        "fields name, url, genres.name, themes.name, game_modes.name, "
+        "fields name, url, first_release_date, genres.name, themes.name, game_modes.name, "
         "age_ratings.rating_category.rating, age_ratings.rating_category.organization.name, "
         "videos.video_id, involved_companies.company.name, involved_companies.developer; "
         "where id = %1;").arg(nativeId);

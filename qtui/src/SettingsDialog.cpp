@@ -18,6 +18,8 @@
 #include <QSpinBox>
 #include <QVBoxLayout>
 
+#include <algorithm>
+
 namespace ssv {
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
@@ -87,6 +89,16 @@ void SettingsDialog::buildUi()
 
     m_preferPopularCheck = new QCheckBox(tr("Prefer popular / most-played games"), filterBox);
     filterLayout->addWidget(m_preferPopularCheck);
+
+    auto* upcomingRow = new QHBoxLayout();
+    upcomingRow->addWidget(new QLabel(tr("Upcoming (unreleased) games:"), filterBox));
+    m_upcomingCombo = new QComboBox(filterBox);
+    m_upcomingCombo->addItem(tr("Mix in occasionally"), QStringLiteral("include"));
+    m_upcomingCombo->addItem(tr("Only upcoming games"), QStringLiteral("only"));
+    m_upcomingCombo->addItem(tr("Hide upcoming games"), QStringLiteral("exclude"));
+    upcomingRow->addWidget(m_upcomingCombo);
+    upcomingRow->addStretch();
+    filterLayout->addLayout(upcomingRow);
 
     root->addWidget(filterBox);
 
@@ -161,6 +173,11 @@ void SettingsDialog::loadConfig()
 
     m_preferPopularCheck->setChecked(cfg.filter.preferPopular);
 
+    const QString upcomingKey = cfg.filter.upcomingMode == UpcomingMode::OnlyUpcoming ? QStringLiteral("only")
+                              : cfg.filter.upcomingMode == UpcomingMode::Exclude      ? QStringLiteral("exclude")
+                                                                                      : QStringLiteral("include");
+    m_upcomingCombo->setCurrentIndex(std::max(0, m_upcomingCombo->findData(upcomingKey)));
+
     m_igdbSourceCheck->setChecked(cfg.sources.enabled.contains(QStringLiteral("igdb"), Qt::CaseInsensitive));
     m_igdbClientIdEdit->setText(cfg.sources.igdbClientId);
     m_igdbClientSecretEdit->setText(cfg.sources.igdbClientSecret);
@@ -184,6 +201,10 @@ Config SettingsDialog::collectConfig() const
     cfg.filter.genres = m_genreModel->checkedGenres();
     cfg.filter.maxAge = m_maxAgeSpin->value();
     cfg.filter.preferPopular = m_preferPopularCheck->isChecked();
+    const QString upcomingKey = m_upcomingCombo->currentData().toString();
+    cfg.filter.upcomingMode = upcomingKey == QStringLiteral("only")    ? UpcomingMode::OnlyUpcoming
+                            : upcomingKey == QStringLiteral("exclude") ? UpcomingMode::Exclude
+                                                                       : UpcomingMode::Include;
 
     cfg.sources.enabled.removeAll(QStringLiteral("igdb"));
     if (m_igdbSourceCheck->isChecked())

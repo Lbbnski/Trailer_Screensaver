@@ -76,6 +76,14 @@ QList<QString> GogTrailerSource::discoverCandidates(const GenreFilter& filter, i
     QStringList discovered;
     int remaining = requestBudget;
 
+    // See SteamTrailerSource: "only upcoming" spends everything on the
+    // unreleased list, since no released game could pass the filter.
+    if (filter.upcoming == UpcomingMode::OnlyUpcoming) {
+        discovered << m_candidateFinder.upcoming(requestBudget, kOnlyUpcomingIdsPerRun, m_repo);
+        discovered.removeDuplicates();
+        return discovered;
+    }
+
     if (filter.preferPopular && remaining > 0) {
         const int spend = std::min(1, remaining);
         discovered << m_candidateFinder.topPlayed(spend, m_repo, m_candidateListTtlSeconds);
@@ -89,6 +97,11 @@ QList<QString> GogTrailerSource::discoverCandidates(const GenreFilter& filter, i
         const int spend = std::min(1, remaining);
         discovered << m_candidateFinder.newAndTrending(spend, m_repo, m_candidateListTtlSeconds);
         remaining -= spend;
+    }
+
+    if (filter.upcoming == UpcomingMode::Include && remaining > 0) {
+        discovered << m_candidateFinder.upcoming(1, kMixedInUpcomingIdsPerRun, m_repo);
+        remaining -= 1;
     }
 
     if (remaining <= 0) {

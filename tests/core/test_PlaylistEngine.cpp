@@ -43,6 +43,7 @@ private slots:
     void preferPopularBoostsPopularCandidates();
     void popularCandidateNotBoostedWithoutPreferPopular();
     void blockedGameIsExcludedRegardlessOfFilter();
+    void upcomingModeFiltersComingSoonCandidates();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -197,6 +198,26 @@ void TestPlaylistEngine::blockedGameIsExcludedRegardlessOfFilter()
 
     m_repo->unblockGame(candidate.sourceId, candidate.nativeId);
     QVERIFY(m_engine->passesFilter(candidate, filter));
+}
+
+void TestPlaylistEngine::upcomingModeFiltersComingSoonCandidates()
+{
+    auto released = makeCandidate("1", {}, 0);
+    auto upcoming = makeCandidate("2", {}, 0);
+    upcoming.comingSoon = true;
+
+    FilterConfig filter;
+    filter.upcomingMode = UpcomingMode::Include;
+    QVERIFY(m_engine->passesFilter(released, filter));
+    QVERIFY(m_engine->passesFilter(upcoming, filter));
+
+    filter.upcomingMode = UpcomingMode::Exclude;
+    QVERIFY(m_engine->passesFilter(released, filter));
+    QVERIFY(!m_engine->passesFilter(upcoming, filter));
+
+    filter.upcomingMode = UpcomingMode::OnlyUpcoming;
+    QVERIFY(!m_engine->passesFilter(released, filter));
+    QVERIFY(m_engine->passesFilter(upcoming, filter));
 }
 
 QTEST_MAIN(TestPlaylistEngine)

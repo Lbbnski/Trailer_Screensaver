@@ -3,6 +3,8 @@
 #include "cache/CacheRepository.h"
 
 #include <QHash>
+#include <QList>
+#include <QPair>
 #include <QSet>
 #include <QString>
 #include <QStringList>
@@ -78,7 +80,23 @@ public:
     // topPlayed()'s "__popular__".
     QStringList newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
+    // Unreleased games, most-wishlisted first, from the storefront's own
+    // "popular coming soon" search filter (50 per page — far more than the
+    // ten `coming_soon` entries featuredcategories carries). At most
+    // `requestBudget` pages are listed, at most once per TTL window; the
+    // ids are recorded under the pseudo-genre "__upcoming__" and flagged
+    // in the cache via CacheRepository::markComingSoon. Returns up to
+    // `maxIds` of them that still lack details — repeat calls drain the
+    // list, so a small maxIds (the default mix-in mode) still gets every
+    // listed game fetched eventually without hogging the per-run detail
+    // budget, while "only upcoming" mode passes a large one.
+    QStringList upcoming(int requestBudget, int maxIds, CacheRepository& repo, qint64 candidateListTtlSeconds);
+
 private:
+    // One page of the storefront search with arbitrary filter parameters
+    // (genre=..&sort_by=.., or filter=popularcomingsoon, ...).
+    QStringList searchStore(const QList<QPair<QString, QString>>& filterParams,
+                             int start, int count, bool* hasMore);
     QStringList searchStorePage(int genreId, int start, int count, bool* hasMore);
     QStringList steamSpyByGenre(const QString& canonicalGenre);
     QStringList steamSpyByTag(const QString& canonicalGenre);

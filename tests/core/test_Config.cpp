@@ -20,6 +20,7 @@ void TestConfig::roundTripsThroughJson()
     original.filter.mode = GenreFilter::Mode::BlockList;
     original.filter.genres = {"Horror", "Shooter"};
     original.filter.maxAge = 12;
+    original.filter.upcomingMode = UpcomingMode::OnlyUpcoming;
     original.filter.blockedContentDescriptors = {"adult-only-sexual-content"};
     original.sources.enabled = {"steam"};
     original.advanced.maxCatalogRequestsPerRun = 25;
@@ -34,6 +35,7 @@ void TestConfig::roundTripsThroughJson()
     QCOMPARE(restored.filter.mode, GenreFilter::Mode::BlockList);
     QCOMPARE(restored.filter.genres, QStringList({"Horror", "Shooter"}));
     QCOMPARE(restored.filter.maxAge, 12);
+    QCOMPARE(restored.filter.upcomingMode, UpcomingMode::OnlyUpcoming);
     QCOMPARE(restored.filter.blockedContentDescriptors, QStringList({"adult-only-sexual-content"}));
     QCOMPARE(restored.sources.enabled, QStringList({"steam"}));
     QCOMPARE(restored.advanced.maxCatalogRequestsPerRun, 25);

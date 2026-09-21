@@ -146,12 +146,22 @@ bool PlaybackSession::start(std::optional<Config> configOverride)
     filter.mode = m_config.filter.mode;
     filter.genres = m_config.filter.genres;
     filter.preferPopular = m_config.filter.preferPopular;
+    filter.upcoming = m_config.filter.upcomingMode;
 
     const auto pool = m_resolver->preparePool(m_config.sources.enabled, filter);
     m_playlist = m_playlistEngine->buildPlaylist(pool, m_config.filter);
     m_playlistIndex = 0;
 
     logInfo(QStringLiteral("session started: pool=%1 playlist=%2").arg(pool.size()).arg(m_playlist.size()));
+    if (m_playlist.isEmpty() && !pool.isEmpty()) {
+        // Nothing to play means a black screen — say why in the log instead
+        // of leaving it to be puzzled out. Typical cause: a filter (most
+        // often "only upcoming games" before enough have been discovered
+        // and detail-fetched) that currently matches nothing in the cache.
+        logWarning(QStringLiteral("playlist is empty although the pool has %1 candidates — the current "
+                                   "genre/age/upcoming filter matches none of them yet; more are discovered "
+                                   "each run").arg(pool.size()));
+    }
 
     return true;
 }

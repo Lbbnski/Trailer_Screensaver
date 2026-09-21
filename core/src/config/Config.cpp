@@ -42,6 +42,23 @@ GenreFilter::Mode filterModeFromString(const QString& s)
     return s == QStringLiteral("blacklist") ? GenreFilter::Mode::BlockList : GenreFilter::Mode::AllowList;
 }
 
+QString toString(UpcomingMode m)
+{
+    switch (m) {
+    case UpcomingMode::OnlyUpcoming: return QStringLiteral("only");
+    case UpcomingMode::Exclude: return QStringLiteral("exclude");
+    case UpcomingMode::Include: break;
+    }
+    return QStringLiteral("include");
+}
+
+UpcomingMode upcomingModeFromString(const QString& s)
+{
+    if (s == QStringLiteral("only")) return UpcomingMode::OnlyUpcoming;
+    if (s == QStringLiteral("exclude")) return UpcomingMode::Exclude;
+    return UpcomingMode::Include; // unknown/missing -> the default
+}
+
 QStringList toStringList(const QJsonArray& arr)
 {
     QStringList out;
@@ -76,6 +93,7 @@ QByteArray Config::toJson() const
         {"maxAge", filter.maxAge},
         {"blockedContentDescriptors", toJsonArray(filter.blockedContentDescriptors)},
         {"preferPopular", filter.preferPopular},
+        {"upcomingMode", toString(filter.upcomingMode)},
     };
 
     QJsonObject steamObj{
@@ -137,6 +155,7 @@ Config Config::fromJson(const QByteArray& json, bool* ok)
     cfg.filter.maxAge = filterObj.value("maxAge").toInt(18);
     cfg.filter.blockedContentDescriptors = toStringList(filterObj.value("blockedContentDescriptors").toArray());
     cfg.filter.preferPopular = filterObj.value("preferPopular").toBool(false);
+    cfg.filter.upcomingMode = upcomingModeFromString(filterObj.value("upcomingMode").toString());
 
     const auto sourcesObj = root.value("sources").toObject();
     cfg.sources.enabled = toStringList(sourcesObj.value("enabled").toArray());

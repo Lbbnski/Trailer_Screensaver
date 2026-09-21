@@ -38,15 +38,21 @@ public:
     // SteamGenreCandidateFinder::isPopularHint().
     bool isPopularHint(const QString& nativeId) const;
 
-    // Seeds from two queries genre-based discovery structurally can't
-    // surface: unreleased games ranked by IGDB's own community-anticipation
-    // signal ("hypes" — the same sort IGDB's own "Most Anticipated" page
-    // uses; total_rating_count, topPlayed()'s sort, is useless here since an
-    // unreleased game has no ratings yet), and already-released games from
-    // roughly the last 90 days ranked by rating count as a "currently being
-    // talked about" proxy. Cached under the pseudo-genre "__recent__", same
+    // Already-released games from roughly the last 90 days, ranked by rating
+    // count as a "currently being talked about" proxy — something
+    // genre-based discovery structurally can't surface (a brand-new game has
+    // few ratings yet). Cached under the pseudo-genre "__recent__", same
     // plumbing as topPlayed()'s "__popular__".
     QStringList newAndTrending(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
+
+    // Unreleased games ranked by IGDB's own community-anticipation signal
+    // ("hypes" — the same sort its "Most Anticipated" page uses;
+    // total_rating_count, topPlayed()'s sort, is useless for an unreleased
+    // game with no ratings yet). One request re-lists it at most once per
+    // TTL window; recorded under "__upcoming__", flagged in the cache via
+    // CacheRepository::markComingSoon, and drained a few ids per run (see
+    // SteamGenreCandidateFinder::upcoming for why).
+    QStringList upcoming(int requestBudget, int maxIds, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
 private:
     QStringList searchPage(const QString& whereClause, int offset, int limit, bool* hasMore);

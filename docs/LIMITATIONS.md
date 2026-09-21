@@ -155,6 +155,15 @@
   standpoint, like they had no trailer at all until that fallback resolves
   one.
 
+- **The "upcoming" flag is a snapshot.** Whether a game counts as
+  unreleased is recorded when its details are fetched (and flagged
+  immediately when it shows up in a coming-soon list), but only cleared when
+  the details are re-fetched, which can take up to the cache TTL after the
+  actual release. "Only upcoming games" can also play nothing (black
+  screen) on the first runs, until enough upcoming games have had their
+  details fetched; each run drains a limited batch. Many unreleased games
+  have no trailer of their own and go through the YouTube fallback.
+
 - **Epic Games Store was evaluated and deliberately not implemented.**
   Epic's storefront GraphQL endpoint (`store.epicgames.com/graphql`)
   returned `403 Forbidden` to plain HTTP requests from two independent

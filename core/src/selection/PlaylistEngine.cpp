@@ -16,6 +16,11 @@ bool PlaylistEngine::passesFilter(const TrailerCandidate& candidate, const Filte
     if (m_repo.isGameBlocked(candidate.sourceId, candidate.nativeId))
         return false;
 
+    if (filter.upcomingMode == UpcomingMode::Exclude && candidate.comingSoon)
+        return false;
+    if (filter.upcomingMode == UpcomingMode::OnlyUpcoming && !candidate.comingSoon)
+        return false;
+
     for (const auto& blocked : filter.blockedContentDescriptors) {
         if (candidate.contentDescriptors.contains(blocked, Qt::CaseInsensitive))
             return false;

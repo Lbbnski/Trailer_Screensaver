@@ -26,6 +26,7 @@ constexpr int kSearchPageSize = 50;
 // the genre_candidates/candidate_pages tables without a schema change.
 const QString kPopularPseudoGenre = QStringLiteral("__popular__");
 const QString kRecentPseudoGenre = QStringLiteral("__recent__");
+const QString kUpcomingPseudoGenre = QStringLiteral("__upcoming__");
 }
 
 SteamGenreCandidateFinder::SteamGenreCandidateFinder(QNetworkAccessManager& networkManager)
@@ -33,7 +34,8 @@ SteamGenreCandidateFinder::SteamGenreCandidateFinder(QNetworkAccessManager& netw
 {
 }
 
-QStringList SteamGenreCandidateFinder::searchStorePage(int genreId, int start, int count, bool* hasMore)
+QStringList SteamGenreCandidateFinder::searchStore(const QList<QPair<QString, QString>>& filterParams,
+                                                    int start, int count, bool* hasMore)
 {
     *hasMore = false;
 
@@ -41,8 +43,8 @@ QStringList SteamGenreCandidateFinder::searchStorePage(int genreId, int start, i
     QUrlQuery query;
     query.addQueryItem("start", QString::number(start));
     query.addQueryItem("count", QString::number(count));
-    query.addQueryItem("genre", QString::number(genreId));
-    query.addQueryItem("sort_by", "Reviews_DESC");
+    for (const auto& [key, value] : filterParams)
+        query.addQueryItem(key, value);
     query.addQueryItem("json", "1");
     url.setQuery(query);
 
@@ -51,22 +53,44 @@ QStringList SteamGenreCandidateFinder::searchStorePage(int genreId, int start, i
 
     std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
     if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
-        logWarning(QStringLiteral("store search request failed for genre id %1").arg(genreId));
+        logWarning(QStringLiteral("store search request failed (start=%1)").arg(start));
         return {};
     }
 
     const auto root = QJsonDocument::fromJson(reply->readAll()).object();
-    const QString html = root.value("html").toString();
 
-    static const QRegularExpression appidPattern(QStringLiteral(R"re(data-ds-appid="(\d+)")re"));
     QStringList appids;
-    auto it = appidPattern.globalMatch(html);
-    while (it.hasNext())
-        appids << it.next().captured(1);
+
+    // With json=1 Steam returns {"desc":"","items":[{"name":..,"logo":..}]} —
+    // no `html` field, and the appid only appears inside each item's logo URL
+    // (.../steam/apps/<appid>/...). This code originally read root["html"],
+    // which that response doesn't have, so the paged store search returned
+    // nothing at all (masked by SteamSpy's bulk lists doing the real work).
+    static const QRegularExpression logoAppid(QStringLiteral(R"re(/apps/(\d+)/)re"));
+    for (const auto& v : root.value("items").toArray()) {
+        const auto match = logoAppid.match(v.toObject().value("logo").toString());
+        if (match.hasMatch())
+            appids << match.captured(1);
+    }
+
+    // Older/alternate response shape, kept as a fallback.
+    if (appids.isEmpty()) {
+        static const QRegularExpression appidPattern(QStringLiteral(R"re(data-ds-appid="(\d+)")re"));
+        auto it = appidPattern.globalMatch(root.value("html").toString());
+        while (it.hasNext())
+            appids << it.next().captured(1);
+    }
     appids.removeDuplicates();
 
     *hasMore = appids.size() >= count; // Steam doesn't return a clean "has more" flag; infer from a full page.
     return appids;
+}
+
+QStringList SteamGenreCandidateFinder::searchStorePage(int genreId, int start, int count, bool* hasMore)
+{
+    return searchStore({{QStringLiteral("genre"), QString::number(genreId)},
+                        {QStringLiteral("sort_by"), QStringLiteral("Reviews_DESC")}},
+                       start, count, hasMore);
 }
 
 QStringList SteamGenreCandidateFinder::steamSpyByGenre(const QString& canonicalGenre)
@@ -213,6 +237,44 @@ QStringList SteamGenreCandidateFinder::discover(const QString& canonicalGenre, i
     repo.setCandidatePageState(sourceId, canonicalGenre, state);
     discovered.removeDuplicates();
     return discovered;
+}
+
+QStringList SteamGenreCandidateFinder::upcoming(int requestBudget, int maxIds, CacheRepository& repo,
+                                                 qint64 candidateListTtlSeconds)
+{
+    if (requestBudget <= 0 || maxIds <= 0)
+        return {};
+
+    const QString sourceId = QStringLiteral("steam");
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    auto state = repo.candidatePageState(sourceId, kUpcomingPseudoGenre);
+
+    // Re-list at most once per TTL window: each page is one request and the
+    // list of most-wishlisted unreleased games changes slowly.
+    if ((now - state.lastRefreshedAt) > candidateListTtlSeconds) {
+        QStringList listed;
+        for (int page = 0; page < requestBudget; ++page) {
+            bool hasMore = false;
+            const auto ids = searchStore({{QStringLiteral("filter"), QStringLiteral("popularcomingsoon")}},
+                                          page * kSearchPageSize, kSearchPageSize, &hasMore);
+            listed << ids;
+            if (!hasMore)
+                break;
+        }
+        listed.removeDuplicates();
+
+        if (!listed.isEmpty()) {
+            repo.addGenreCandidates(sourceId, kUpcomingPseudoGenre, listed, now);
+            repo.markComingSoon(sourceId, listed);
+            state.lastRefreshedAt = now;
+            repo.setCandidatePageState(sourceId, kUpcomingPseudoGenre, state);
+        }
+    }
+
+    // Hand back only what doesn't have details yet, a few per run, so the
+    // listed games drain into the pool across runs instead of all but the
+    // first detail-fetch-budget's worth being dropped.
+    return repo.unfetchedCandidates(sourceId, kUpcomingPseudoGenre, now, maxIds);
 }
 
 QStringList SteamGenreCandidateFinder::tagHintsFor(const QString& nativeId) const

@@ -23,6 +23,7 @@ struct FilterConfig {
     int maxAge = 18;
     QStringList blockedContentDescriptors;   // e.g. "adult-only" — excluded regardless of maxAge
     bool preferPopular = false;              // see GenreFilter::preferPopular
+    UpcomingMode upcomingMode = UpcomingMode::Include; // see GenreFilter::upcoming
 };
 
 struct SourcesConfig {

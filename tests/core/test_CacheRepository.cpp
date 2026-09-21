@@ -15,6 +15,8 @@ private slots:
     void init();
 
     void upsertThenGetRoundTrips();
+    void comingSoonIsStoredMarkedAndOverwritten();
+    void unfetchedCandidatesExcludesFreshRows();
     void freshDetailsRespectsStaleAfter();
     void candidatePageStatePersists();
     void fallbackVideoIdRoundTrips();
@@ -289,6 +291,38 @@ void TestCacheRepository::migrationStripsFallbackVideosBakedIntoApps()
     // ...and the fallback cache itself is untouched, so it can still serve
     // the video (subject to its own version/rejection checks).
     QVERIFY(repo.fallbackVideoId("steam", "1").has_value());
+}
+
+void TestCacheRepository::comingSoonIsStoredMarkedAndOverwritten()
+{
+    TrailerCandidate c;
+    c.sourceId = QStringLiteral("steam");
+    c.nativeId = QStringLiteral("10");
+    c.title = QStringLiteral("Soon");
+    m_repo->upsertAppDetails(c, false, 1000, 2000);
+    QVERIFY(!m_repo->getAppDetails(c.sourceId, c.nativeId)->comingSoon);
+
+    m_repo->markComingSoon(c.sourceId, {c.nativeId, QStringLiteral("not-cached")});
+    QVERIFY(m_repo->getAppDetails(c.sourceId, c.nativeId)->comingSoon);
+
+    // A re-fetch after release clears the flag again.
+    m_repo->upsertAppDetails(c, false, 1500, 2500);
+    QVERIFY(!m_repo->getAppDetails(c.sourceId, c.nativeId)->comingSoon);
+}
+
+void TestCacheRepository::unfetchedCandidatesExcludesFreshRows()
+{
+    const QString src = QStringLiteral("steam");
+    m_repo->addGenreCandidates(src, QStringLiteral("__upcoming__"), {"1", "2", "3"}, 1000);
+
+    TrailerCandidate c;
+    c.sourceId = src;
+    c.nativeId = QStringLiteral("2");
+    m_repo->upsertAppDetails(c, false, 1000, 5000);
+
+    const auto ids = m_repo->unfetchedCandidates(src, QStringLiteral("__upcoming__"), 2000, 10);
+    QCOMPARE(QSet<QString>(ids.begin(), ids.end()), QSet<QString>({"1", "3"}));
+    QCOMPARE(m_repo->unfetchedCandidates(src, QStringLiteral("__upcoming__"), 2000, 1).size(), 1);
 }
 
 QTEST_MAIN(TestCacheRepository)

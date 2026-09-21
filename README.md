@@ -24,6 +24,10 @@ Linux.
 - **Genre and age filtering**, allow-list or block-list, plus a "prefer
   popular / most-played games" option (backed by SteamSpy's top-played
   lists).
+- **Upcoming (unreleased) games**: a setting to mix them in occasionally
+  (default), show only upcoming games, or hide them. Discovered from
+  Steam's popular-coming-soon list, GOG's coming-soon entries and IGDB's
+  most-hyped unreleased games.
 - **Quality-checked YouTube fallback**: the search query is disambiguated
   with the game's developer name (so a same-named movie or unrelated video
   doesn't win), and each of several results must pass a stack of checks
@@ -121,7 +125,7 @@ platform), `SSV_STATIC_QT` (default off).
 One settings dialog is shared across all three entry points (Windows `/c`,
 the Linux hack's `--configure`, and the standalone `settings-gui`):
 resolution cap, multi-monitor mode, mute/hardware-decode toggles, genre
-allow/block-list, maximum age rating, "prefer popular games", a debug log
+allow/block-list, maximum age rating, "prefer popular games", the upcoming-games mode, a debug log
 overlay toggle (off by default — shows a live tail of the app's log on top
 of the video, for troubleshooting), the IGDB source toggle with its Twitch
 Client ID/Secret fields, a GOG source toggle (no fields needed), and a

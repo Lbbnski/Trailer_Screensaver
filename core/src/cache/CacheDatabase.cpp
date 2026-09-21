@@ -131,6 +131,12 @@ bool CacheDatabase::migrate(QSqlDatabase& db)
     // view (see qtui/src/PlaybackHistoryDialog.h).
     q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN store_url TEXT"));
 
+    // Whether the game was unreleased when its details were last fetched
+    // (see TrailerCandidate::comingSoon). Every pre-existing row defaults to
+    // 0 = released; upcoming discovery flips the ones it finds via
+    // CacheRepository::markComingSoon rather than waiting out the details TTL.
+    q.exec(QStringLiteral("ALTER TABLE apps ADD COLUMN coming_soon INTEGER NOT NULL DEFAULT 0"));
+
     // playback_history started as just enough to drive the no-repeat-window
     // check (source_id/native_id/played_at). These columns denormalize a
     // snapshot of what was actually played — title/developer/store_url from
