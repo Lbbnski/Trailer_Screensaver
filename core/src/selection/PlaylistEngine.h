@@ -41,6 +41,9 @@ private:
     // reintroduce the identical-order-every-loop problem
     // wrapPlaylistIndexIfNeeded() fixes — it only changes relative odds.
     static constexpr int kPopularBoostFactor = 3;
+
+    // Same idea for recent/upcoming releases (see buildPlaylist).
+    static constexpr int kRecentBoostFactor = 3;
 };
 
 } // namespace ssv

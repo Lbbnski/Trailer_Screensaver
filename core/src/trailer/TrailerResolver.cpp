@@ -55,7 +55,27 @@ QList<TrailerCandidate> TrailerResolver::preparePool(const QStringList& enabledS
                         .arg(sourceId).arg(fresh.size()).arg(newIds.size()).arg(budgetPerSource - discoveryBudget));
 
             int detailBudget = budgetPerSource - discoveryBudget;
-            for (const auto& nativeId : newIds) {
+
+            // What to detail-fetch, in order: half the budget for the
+            // "new / upcoming / popular" lists, so recent games keep
+            // entering the pool (genre discovery structurally favors old,
+            // heavily-reviewed ones), then whatever this run's discovery
+            // returned, then a random slice of the backlog of discovered-
+            // but-never-fetched ids. Without the backlog the pool froze at
+            // the first few hundred games ever fetched, since discovery
+            // only returns an id in the run that first lists it.
+            QStringList queue;
+            const int recentShare = (detailBudget + 1) / 2;
+            for (const auto& list : {QStringLiteral("__upcoming__"), QStringLiteral("__recent__"), QStringLiteral("__popular__")}) {
+                if (queue.size() >= recentShare)
+                    break;
+                queue << m_repo.unfetchedCandidates(sourceId, list, now, recentShare - int(queue.size()));
+            }
+            queue << newIds;
+            queue << m_repo.unfetchedAnyCandidates(sourceId, now, detailBudget);
+            queue.removeDuplicates();
+
+            for (const auto& nativeId : queue) {
                 if (detailBudget <= 0)
                     break;
                 if (m_repo.hasFreshDetails(sourceId, nativeId, now))

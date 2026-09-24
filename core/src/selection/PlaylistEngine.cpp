@@ -1,7 +1,9 @@
 #include "selection/PlaylistEngine.h"
 
 #include <QDateTime>
+#include <QHash>
 #include <QRandomGenerator>
+#include <QSet>
 
 namespace ssv {
 
@@ -53,6 +55,22 @@ QList<TrailerCandidate> PlaylistEngine::buildPlaylist(const QList<TrailerCandida
     const qint64 now = QDateTime::currentSecsSinceEpoch();
     const qint64 since = now - noRepeatWindowSeconds;
 
+    // Games from a source's new/upcoming lists get extra playlist entries so
+    // recent releases aren't drowned out by the (far larger) old catalog.
+    QHash<QString, QSet<QString>> recentIds;
+    auto isRecent = [&](const TrailerCandidate& c) {
+        auto it = recentIds.find(c.sourceId);
+        if (it == recentIds.end()) {
+            QSet<QString> ids;
+            for (const auto& list : {QStringLiteral("__recent__"), QStringLiteral("__upcoming__")}) {
+                const auto listed = m_repo.genreCandidates(c.sourceId, list);
+                ids.unite(QSet<QString>(listed.begin(), listed.end()));
+            }
+            it = recentIds.insert(c.sourceId, ids);
+        }
+        return it->contains(c.nativeId) || c.comingSoon;
+    };
+
     QList<TrailerCandidate> playlist;
     for (const auto& candidate : pool) {
         if (!passesFilter(candidate, filter))
@@ -73,6 +91,10 @@ QList<TrailerCandidate> PlaylistEngine::buildPlaylist(const QList<TrailerCandida
             continue;
 
         playlist.append(candidate);
+        if (isRecent(candidate)) {
+            for (int i = 1; i < kRecentBoostFactor; ++i)
+                playlist.append(candidate);
+        }
         if (filter.preferPopular && candidate.discoveredAsPopular) {
             for (int i = 1; i < kPopularBoostFactor; ++i)
                 playlist.append(candidate);

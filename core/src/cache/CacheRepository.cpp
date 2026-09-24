@@ -232,6 +232,31 @@ void CacheRepository::addGenreCandidates(const QString& sourceId, const QString&
         db.commit();
 }
 
+QStringList CacheRepository::unfetchedAnyCandidates(const QString& sourceId, qint64 nowEpoch, int limit) const
+{
+    QStringList out;
+    QSqlQuery q(m_db.handle());
+    q.prepare(R"(
+        SELECT DISTINCT g.native_id FROM genre_candidates g
+        WHERE g.source_id = :s
+          AND NOT EXISTS (SELECT 1 FROM apps a
+                          WHERE a.source_id = g.source_id AND a.native_id = g.native_id
+                            AND a.details_stale_after > :now)
+        ORDER BY RANDOM()
+        LIMIT :limit
+    )");
+    q.bindValue(":s", sourceId);
+    q.bindValue(":now", nowEpoch);
+    q.bindValue(":limit", limit);
+    if (!q.exec()) {
+        logError(QStringLiteral("unfetchedAnyCandidates failed: %1").arg(q.lastError().text()));
+        return out;
+    }
+    while (q.next())
+        out << q.value(0).toString();
+    return out;
+}
+
 QStringList CacheRepository::genreCandidates(const QString& sourceId, const QString& genre) const
 {
     QStringList out;

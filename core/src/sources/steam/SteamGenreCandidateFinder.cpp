@@ -322,6 +322,18 @@ QStringList SteamGenreCandidateFinder::newAndTrending(int requestBudget, CacheRe
                 discovered << QString::number(appId);
         }
     }
+
+    // featuredcategories only lists a few dozen; the store search's
+    // "popular new releases" filter, newest first, adds a broader (and
+    // already popularity-screened, so not just shovelware) recent slice.
+    for (int page = 0; page < 2; ++page) {
+        bool hasMore = false;
+        discovered << searchStore({{QStringLiteral("filter"), QStringLiteral("popularnew")},
+                                    {QStringLiteral("sort_by"), QStringLiteral("Released_DESC")}},
+                                   page * kSearchPageSize, kSearchPageSize, &hasMore);
+        if (!hasMore)
+            break;
+    }
     discovered.removeDuplicates();
 
     if (!discovered.isEmpty())

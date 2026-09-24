@@ -60,6 +60,14 @@ public:
     QStringList unfetchedCandidates(const QString& sourceId, const QString& genre,
                                      qint64 nowEpoch, int limit) const;
 
+    // Like unfetchedCandidates() but across every list the source has
+    // discovered (all genres and pseudo-lists), in random order. This is the
+    // backlog TrailerResolver drains once a run's own fresh discovery is
+    // used up: discovery pages through a genre only once per TTL, so without
+    // this the ids it found but never got the budget to detail-fetch were
+    // never fetched at all and the playable pool stopped growing.
+    QStringList unfetchedAnyCandidates(const QString& sourceId, qint64 nowEpoch, int limit) const;
+
     // All cached candidates for a source that are not stale as of nowEpoch.
     // PlaylistEngine applies genre/age filtering on top of this — the cache
     // layer doesn't know about the user's filter settings.

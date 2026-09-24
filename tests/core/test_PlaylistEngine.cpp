@@ -44,6 +44,7 @@ private slots:
     void popularCandidateNotBoostedWithoutPreferPopular();
     void blockedGameIsExcludedRegardlessOfFilter();
     void upcomingModeFiltersComingSoonCandidates();
+    void recentReleasesGetMoreEntries();
 
 private:
     std::unique_ptr<CacheDatabase> m_db;
@@ -218,6 +219,20 @@ void TestPlaylistEngine::upcomingModeFiltersComingSoonCandidates()
     filter.upcomingMode = UpcomingMode::OnlyUpcoming;
     QVERIFY(!m_engine->passesFilter(released, filter));
     QVERIFY(m_engine->passesFilter(upcoming, filter));
+}
+
+void TestPlaylistEngine::recentReleasesGetMoreEntries()
+{
+    m_repo->addGenreCandidates(QStringLiteral("steam"), QStringLiteral("__recent__"), {"2"}, 1000);
+
+    const QList<TrailerCandidate> pool{makeCandidate("1", {}, 0), makeCandidate("2", {}, 0)};
+    const auto playlist = m_engine->buildPlaylist(pool, FilterConfig{}, 0);
+
+    int older = 0, recent = 0;
+    for (const auto& c : playlist)
+        (c.nativeId == QStringLiteral("2") ? recent : older)++;
+    QCOMPARE(older, 1);
+    QVERIFY(recent > older);
 }
 
 QTEST_MAIN(TestPlaylistEngine)
