@@ -1,5 +1,6 @@
 #include "config/Config.h"
 #include "config/ConfigPaths.h"
+#include "sources/GenreTaxonomy.h"
 
 #include <QDir>
 #include <QFile>
@@ -11,6 +12,28 @@
 namespace ssv {
 
 namespace {
+
+// The settings dialog writes the full checked list, so a user who never
+// narrowed the filter has exactly the original 23 genres saved. When the
+// taxonomy grew, those users would otherwise silently start filtering out
+// games whose only genres are new ones (e.g. a Roguelike tagged nothing
+// else); a saved allow-list that is exactly the original 23 means
+// "everything", so extend it to everything. Anyone who unchecked any of the
+// originals, or already has a new genre in the list, is left alone.
+void migrateLegacyGenreSelection(FilterConfig& filter)
+{
+    if (filter.mode != GenreFilter::Mode::AllowList)
+        return;
+    const auto& all = GenreTaxonomy::canonicalGenres();
+    const auto legacy = all.mid(0, GenreTaxonomy::kLegacyGenreCount);
+    if (filter.genres.size() != legacy.size())
+        return;
+    for (const auto& g : legacy) {
+        if (!filter.genres.contains(g, Qt::CaseInsensitive))
+            return;
+    }
+    filter.genres = all;
+}
 
 QString toString(MaxResolution r)
 {
@@ -152,6 +175,7 @@ Config Config::fromJson(const QByteArray& json, bool* ok)
     const auto filterObj = root.value("filter").toObject();
     cfg.filter.mode = filterModeFromString(filterObj.value("mode").toString());
     cfg.filter.genres = toStringList(filterObj.value("genres").toArray());
+    migrateLegacyGenreSelection(cfg.filter);
     cfg.filter.maxAge = filterObj.value("maxAge").toInt(18);
     cfg.filter.blockedContentDescriptors = toStringList(filterObj.value("blockedContentDescriptors").toArray());
     cfg.filter.preferPopular = filterObj.value("preferPopular").toBool(false);

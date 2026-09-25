@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <optional>
 
 namespace ssv {
@@ -16,6 +17,11 @@ public:
     // allow-listed genre filter, same "falls through, doesn't crash"
     // behavior as SteamGenreMap::toCanonical() for its own unmapped labels).
     static QString toCanonical(const QString& igdbLabel);
+
+    // toCanonical() plus any more specific canonical genres the label
+    // implies (IGDB's "Real Time Strategy (RTS)" -> Strategy and
+    // Real-Time Strategy). Always starts with toCanonical()'s result.
+    static QStringList toCanonicalAll(const QString& igdbLabel);
 
     // The reverse direction, used by IgdbCandidateFinder to build a
     // discovery query's `where` clause: an Apicalypse filter fragment (e.g.

@@ -1,3 +1,4 @@
+#include "sources/GenreTaxonomy.h"
 #include "sources/gog/GogGenreMap.h"
 
 #include <QtTest/QtTest>
@@ -7,51 +8,74 @@ using namespace ssv;
 class TestGogGenreMap : public QObject {
     Q_OBJECT
 private slots:
-    void mapsKnownLabels();
+    void mapsGenresAndTags();
     void passesThroughUnknownLabelsUnchanged();
-    void categoryParamRoundTripsForEveryMappedGenre();
-    void categoryParamIsNulloptForGenresGogCannotExpress();
-    void categoryParamIsNulloptForGenresWithNoConfirmedFacet();
+    void canonicalIfKnownRejectsUnknownLabels();
+    void catalogFilterUsesGenreFacetsWhereGogHasThem();
+    void catalogFilterUsesTagsForEverythingElse();
+    void catalogFilterIsNulloptForGenresGogCannotExpress();
+    void everyMappedGenreIsCanonical();
 };
 
-void TestGogGenreMap::mapsKnownLabels()
+void TestGogGenreMap::mapsGenresAndTags()
 {
     QCOMPARE(GogGenreMap::toCanonical("Simulation"), QStringLiteral("Simulation"));
-    QCOMPARE(GogGenreMap::toCanonical("rpg"), QStringLiteral("RPG"));
+    QCOMPARE(GogGenreMap::toCanonical("Role-playing"), QStringLiteral("RPG"));
     QCOMPARE(GogGenreMap::toCanonical("  Strategy  "), QStringLiteral("Strategy"));
-    // Confirmed present in a real embed.gog.com response alongside actual
-    // genres, in this exact casing.
     QCOMPARE(GogGenreMap::toCanonical("Sci-fi"), QStringLiteral("Sci-Fi"));
+    // Tags: several fold into one canonical genre.
+    QCOMPARE(GogGenreMap::toCanonical("Roguelite"), QStringLiteral("Roguelike"));
+    QCOMPARE(GogGenreMap::toCanonical("Survival Horror"), QStringLiteral("Horror"));
+    QCOMPARE(GogGenreMap::toCanonical("Point&Click"), QStringLiteral("Point & Click"));
 }
 
 void TestGogGenreMap::passesThroughUnknownLabelsUnchanged()
 {
-    // GOG mixes thematic tags into the same "genres" list; those have no
-    // canonical equivalent and must pass through unchanged, not crash.
-    QCOMPARE(GogGenreMap::toCanonical("Historical"), QStringLiteral("Historical"));
-    QCOMPARE(GogGenreMap::toCanonical("Comedy"), QStringLiteral("Comedy"));
+    QCOMPARE(GogGenreMap::toCanonical("Great Soundtrack"), QStringLiteral("Great Soundtrack"));
 }
 
-void TestGogGenreMap::categoryParamRoundTripsForEveryMappedGenre()
+void TestGogGenreMap::canonicalIfKnownRejectsUnknownLabels()
 {
-    const auto param = GogGenreMap::categoryParamFor(QStringLiteral("Strategy"));
-    QVERIFY(param.has_value());
-    QCOMPARE(GogGenreMap::toCanonical(*param), QStringLiteral("Strategy"));
+    QVERIFY(!GogGenreMap::canonicalIfKnown("Great Soundtrack").has_value());
+    QVERIFY(!GogGenreMap::canonicalIfKnown("Only On GOG").has_value());
+    QCOMPARE(*GogGenreMap::canonicalIfKnown("Cyberpunk"), QStringLiteral("Cyberpunk"));
 }
 
-void TestGogGenreMap::categoryParamIsNulloptForGenresWithNoConfirmedFacet()
+void TestGogGenreMap::catalogFilterUsesGenreFacetsWhereGogHasThem()
 {
-    // These have real GOG genre *labels* (toCanonicalTable still maps them
-    // when parsing a product's own genres list) but no confirmed, working
-    // `category` query-facet slug — see categoryParamTable()'s comment.
-    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Horror")).has_value());
-    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Sci-Fi")).has_value());
+    const auto filter = GogGenreMap::catalogFilterFor(QStringLiteral("RPG"));
+    QVERIFY(filter.has_value());
+    QCOMPARE(filter->param, QStringLiteral("genres"));
+    QCOMPARE(filter->slug, QStringLiteral("rpg"));
 }
 
-void TestGogGenreMap::categoryParamIsNulloptForGenresGogCannotExpress()
+void TestGogGenreMap::catalogFilterUsesTagsForEverythingElse()
 {
-    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Free To Play")).has_value());
-    QVERIFY(!GogGenreMap::categoryParamFor(QStringLiteral("Early Access")).has_value());
+    const auto filter = GogGenreMap::catalogFilterFor(QStringLiteral("Roguelike"));
+    QVERIFY(filter.has_value());
+    QCOMPARE(filter->param, QStringLiteral("tags"));
+    QCOMPARE(filter->slug, QStringLiteral("roguelike"));
+}
+
+void TestGogGenreMap::catalogFilterIsNulloptForGenresGogCannotExpress()
+{
+    QVERIFY(!GogGenreMap::catalogFilterFor(QStringLiteral("Massively Multiplayer")).has_value());
+    QVERIFY(!GogGenreMap::catalogFilterFor(QStringLiteral("Early Access")).has_value());
+}
+
+void TestGogGenreMap::everyMappedGenreIsCanonical()
+{
+    // A typo in either table would otherwise create a "genre" nobody can
+    // select in the settings dialog.
+    for (const auto& genre : GenreTaxonomy::canonicalGenres()) {
+        if (const auto filter = GogGenreMap::catalogFilterFor(genre))
+            QVERIFY2(!filter->slug.isEmpty(), qPrintable(genre));
+    }
+    for (const char* label : {"Roguelike", "Cozy", "Cyberpunk", "Sexual Content", "Team sport"}) {
+        const auto canonical = GogGenreMap::canonicalIfKnown(QString::fromLatin1(label));
+        QVERIFY2(canonical.has_value(), label);
+        QVERIFY2(GenreTaxonomy::isCanonical(*canonical), qPrintable(*canonical));
+    }
 }
 
 QTEST_MAIN(TestGogGenreMap)

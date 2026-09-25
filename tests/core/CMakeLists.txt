@@ -24,6 +24,10 @@ add_executable(test_GogGenreMap test_GogGenreMap.cpp)
 target_link_libraries(test_GogGenreMap PRIVATE ssvcore Qt6::Test)
 add_test(NAME GogGenreMap COMMAND test_GogGenreMap)
 
+add_executable(test_SteamGenreMap test_SteamGenreMap.cpp)
+target_link_libraries(test_SteamGenreMap PRIVATE ssvcore Qt6::Test)
+add_test(NAME SteamGenreMap COMMAND test_SteamGenreMap)
+
 add_executable(test_TrailerHeuristics test_TrailerHeuristics.cpp)
 target_link_libraries(test_TrailerHeuristics PRIVATE ssvcore Qt6::Test)
 add_test(NAME TrailerHeuristics COMMAND test_TrailerHeuristics)

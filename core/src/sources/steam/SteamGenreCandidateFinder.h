@@ -51,12 +51,12 @@ public:
     QStringList topPlayed(int requestBudget, CacheRepository& repo, qint64 candidateListTtlSeconds);
 
     // Canonical genres a native id was discovered under via the tag-only
-    // path (steamSpyByTag) during the most recent discover() call on this
+    // path (store search by tag id) during the most recent discover() call on this
     // instance — empty if none. Steam's own appdetails `genres` field is
     // limited to a small fixed set (Action, Adventure, RPG, Strategy, ...)
     // that doesn't include tag-style genres at all: verified directly that
     // Resident Evil Village's own `genres` is just `["Action"]` despite
-    // SteamSpy correctly tagging it "Horror". Without this, a candidate
+    // Steam tagging it "Horror". Without this, a candidate
     // discovered specifically *because* it matched a tag-only genre would
     // never actually carry that genre in its cached canonicalGenres, and
     // silently fail the user's own filter for the genre that found it —
@@ -73,7 +73,7 @@ public:
     // Seeds from store.steampowered.com/api/featuredcategories' "new_releases"
     // and "coming_soon" sections — the same storefront-front-page endpoint
     // Steam's own site uses, one call for both lists. Genre-based discovery
-    // (steamSpyByGenre/steamSpyByTag/searchStorePage, all sorted by
+    // (steamSpyByGenre/searchStore, all sorted by
     // reviews/popularity) structurally favors long-established games, so
     // without this a new or not-yet-released title essentially never
     // surfaces. Cached under the pseudo-genre "__recent__", same plumbing as
@@ -99,7 +99,6 @@ private:
                              int start, int count, bool* hasMore);
     QStringList searchStorePage(int genreId, int start, int count, bool* hasMore);
     QStringList steamSpyByGenre(const QString& canonicalGenre);
-    QStringList steamSpyByTag(const QString& canonicalGenre);
     QStringList steamSpyTop(const QString& request);
 
     QNetworkAccessManager& m_networkManager;

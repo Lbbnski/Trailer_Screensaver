@@ -129,22 +129,18 @@
   informational log line — Steam alone still works exactly as before.
 
 - **GOG's API is unofficial and undocumented** (no published SLA, same
-  category of risk as Steam's own storefront endpoints) — `embed.gog.com`
-  and `api.gog.com` are community-reverse-engineered, not published by
-  GOG/CDPR. No credentials are needed and no confirmed rate limit was
-  found. The listing endpoint's `category` facet turned out to be a small,
-  genuinely fixed vocabulary — much like Steam's own official `genres` ids
-  (see IgdbGenreMap's comment on the same problem) — and, critically, an
-  *unrecognized* `category` value returns a hard HTTP 500, not a graceful
-  fallback to default ordering as originally assumed. `GogGenreMap` only
-  maps a canonical genre to GOG's `category` facet once verified live to
-  return real results; several genres this app supports (Horror, Puzzle,
-  Platformer, Fighting, Massively Multiplayer, Sci-Fi, Fantasy, Survival,
-  Stealth, Sandbox, Visual Novel, at last check) have no confirmed working
-  facet at all and are left unmapped — GOG just contributes nothing extra
-  for those specific genre searches (still contributes normally for
-  `preferPopular`'s unfiltered listing, and for every genre it does have a
-  facet for) rather than failing.
+  category of risk as Steam's own storefront endpoints) —
+  `catalog.gog.com` and `api.gog.com` are community-reverse-engineered, not
+  published by GOG/CDPR. No credentials are needed and no confirmed rate
+  limit was found. Genre discovery uses the catalog's `genres=` and `tags=`
+  filters (an unknown slug returns an empty listing, not an error). GOG has
+  no equivalent for a few canonical genres (Massively Multiplayer, Early
+  Access, MOBA, ...); GOG simply contributes nothing for those.
+- **Games discovered before the category expansion keep their old, coarser
+  genres until their cache entry expires** (up to 21 days). A game only
+  gains the new tags (Roguelike, Cozy, ...) when its details are fetched
+  again, so a very narrow filter on a new category finds few games at first
+  and more as the cache refreshes.
 - **GOG trailers hosted on Wistia (rather than YouTube) are not resolved.**
   GOG's product-video field reports a `provider` per video; only
   `provider == "youtube"` entries are played directly. Wistia's own

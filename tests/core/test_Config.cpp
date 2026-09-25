@@ -1,4 +1,5 @@
 #include "config/Config.h"
+#include "sources/GenreTaxonomy.h"
 
 #include <QtTest/QtTest>
 
@@ -9,6 +10,8 @@ class TestConfig : public QObject {
 private slots:
     void roundTripsThroughJson();
     void malformedJsonFallsBackToDefaults();
+    void originalFullGenreListIsExtendedToNewGenres();
+    void customGenreSelectionIsLeftAlone();
 };
 
 void TestConfig::roundTripsThroughJson()
@@ -48,6 +51,29 @@ void TestConfig::malformedJsonFallsBackToDefaults()
     QVERIFY(!ok);
     QCOMPARE(cfg.version, Config::kCurrentVersion);
     QCOMPARE(cfg.sources.enabled, QStringList({"steam"}));
+}
+
+void TestConfig::originalFullGenreListIsExtendedToNewGenres()
+{
+    Config legacy;
+    legacy.filter.genres = GenreTaxonomy::canonicalGenres().mid(0, GenreTaxonomy::kLegacyGenreCount);
+
+    const Config restored = Config::fromJson(legacy.toJson(), nullptr);
+    QCOMPARE(restored.filter.genres, GenreTaxonomy::canonicalGenres());
+}
+
+void TestConfig::customGenreSelectionIsLeftAlone()
+{
+    Config narrowed;
+    narrowed.filter.genres = GenreTaxonomy::canonicalGenres().mid(0, GenreTaxonomy::kLegacyGenreCount);
+    narrowed.filter.genres.removeAll(QStringLiteral("Horror"));
+
+    QCOMPARE(Config::fromJson(narrowed.toJson(), nullptr).filter.genres, narrowed.filter.genres);
+
+    Config blockList;
+    blockList.filter.mode = GenreFilter::Mode::BlockList;
+    blockList.filter.genres = GenreTaxonomy::canonicalGenres().mid(0, GenreTaxonomy::kLegacyGenreCount);
+    QCOMPARE(Config::fromJson(blockList.toJson(), nullptr).filter.genres, blockList.filter.genres);
 }
 
 QTEST_MAIN(TestConfig)

@@ -44,11 +44,11 @@ TrailerCandidate parseGame(const QJsonObject& game)
     // (see IgdbGenreMap's header comment) — run every label from all three
     // through the same map and merge.
     for (const auto& label : namesFrom(game.value("genres").toArray()))
-        candidate.canonicalGenres << IgdbGenreMap::toCanonical(label);
+        candidate.canonicalGenres << IgdbGenreMap::toCanonicalAll(label);
     for (const auto& label : namesFrom(game.value("themes").toArray()))
-        candidate.canonicalGenres << IgdbGenreMap::toCanonical(label);
+        candidate.canonicalGenres << IgdbGenreMap::toCanonicalAll(label);
     for (const auto& label : namesFrom(game.value("game_modes").toArray()))
-        candidate.canonicalGenres << IgdbGenreMap::toCanonical(label);
+        candidate.canonicalGenres << IgdbGenreMap::toCanonicalAll(label);
     candidate.canonicalGenres.removeDuplicates();
 
     // Take the strictest (highest minimum age) across every regional rating

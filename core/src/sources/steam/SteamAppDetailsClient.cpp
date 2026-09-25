@@ -89,6 +89,39 @@ SteamAppDetailsClient::SteamAppDetailsClient(QNetworkAccessManager& networkManag
 {
 }
 
+QStringList SteamAppDetailsClient::fetchTagGenres(const QString& appid)
+{
+    QUrl url(QStringLiteral("https://api.steampowered.com/IStoreBrowseService/GetItems/v1"));
+    QUrlQuery query;
+    const QString input = QStringLiteral(
+        R"({"ids":[{"appid":%1}],"context":{"language":"%2","country_code":"%3"},"data_request":{"include_tag_count":20}})")
+        .arg(appid, m_language, m_countryCode);
+    query.addQueryItem("input_json", input);
+    url.setQuery(query);
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("SteamTrailerScreensaver/1.0"));
+
+    std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
+    if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
+        logWarning(QStringLiteral("tag request for %1 failed").arg(appid));
+        return {};
+    }
+
+    QStringList genres;
+    const auto items = QJsonDocument::fromJson(reply->readAll()).object()
+                           .value("response").toObject().value("store_items").toArray();
+    for (const auto& item : items) {
+        for (const auto& tag : item.toObject().value("tags").toArray()) {
+            const int tagId = tag.toObject().value("tagid").toInt();
+            if (const auto canonical = SteamGenreMap::canonicalForTagId(tagId))
+                genres << *canonical;
+        }
+    }
+    genres.removeDuplicates();
+    return genres;
+}
+
 std::optional<TrailerCandidate> SteamAppDetailsClient::fetchDetails(const QString& appid)
 {
     QUrl url(QStringLiteral("https://store.steampowered.com/api/appdetails"));
@@ -138,6 +171,8 @@ std::optional<TrailerCandidate> SteamAppDetailsClient::fetchDetails(const QStrin
 
     for (const auto& g : data.value("genres").toArray())
         candidate.canonicalGenres << SteamGenreMap::toCanonical(g.toObject().value("description").toString());
+    candidate.canonicalGenres << fetchTagGenres(appid);
+    candidate.canonicalGenres.removeDuplicates();
     candidate.canonicalGenres.removeDuplicates();
 
     // required_age is documented as a string in some responses and a

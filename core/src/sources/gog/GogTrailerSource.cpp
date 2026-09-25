@@ -131,16 +131,6 @@ QList<QString> GogTrailerSource::discoverCandidates(const GenreFilter& filter, i
 std::optional<TrailerCandidate> GogTrailerSource::fetchDetails(const QString& nativeId)
 {
     TrailerCandidate candidate = m_candidateFinder.pendingMetadata(nativeId);
-    if (candidate.nativeId.isEmpty()) {
-        // Not discovered by this instance this run (e.g. called out of the
-        // normal discoverCandidates()-then-fetchDetails() sequence) — still
-        // produce a minimal, valid candidate rather than failing outright;
-        // it just won't carry genre/developer/age info.
-        candidate.sourceId = id();
-        candidate.nativeId = nativeId;
-        logWarning(QStringLiteral("gog: fetchDetails(%1) called with no pending metadata from discovery — "
-                                   "genre/age/developer will be empty for this candidate").arg(nativeId));
-    }
 
     QUrl url(QStringLiteral("https://api.gog.com/products/%1").arg(nativeId));
     QUrlQuery query;
@@ -153,11 +143,29 @@ std::optional<TrailerCandidate> GogTrailerSource::fetchDetails(const QString& na
     std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
     if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
         logWarning(QStringLiteral("gog: product detail request for %1 failed").arg(nativeId));
+        if (candidate.nativeId.isEmpty())
+            return std::nullopt;
         candidate.needsFallbackResolution = true;
         return candidate;
     }
 
     const auto root = QJsonDocument::fromJson(reply->readAll()).object();
+
+    if (candidate.nativeId.isEmpty()) {
+        // Discovered in an earlier run (TrailerResolver also drains the
+        // cache's backlog of never-fetched ids), so this instance has no
+        // listing metadata for it. The product endpoint knows the title;
+        // the catalog then gives genres/tags/age/developer for it. Without
+        // that there is nothing worth caching (an id with no title or
+        // genres would just sit in the pool as a blank entry), so skip it —
+        // it stays in the backlog for a later attempt.
+        candidate = m_candidateFinder.lookupMetadata(nativeId, root.value("title").toString());
+        if (candidate.nativeId.isEmpty()) {
+            logWarning(QStringLiteral("gog: no listing metadata found for %1 — skipping").arg(nativeId));
+            return std::nullopt;
+        }
+    }
+
     candidate.renditions = parseVideos(root.value("videos").toArray());
     candidate.needsFallbackResolution = candidate.renditions.isEmpty();
 

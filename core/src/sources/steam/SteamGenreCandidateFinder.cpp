@@ -112,25 +112,6 @@ QStringList SteamGenreCandidateFinder::steamSpyByGenre(const QString& canonicalG
     return root.keys(); // object keyed by appid
 }
 
-QStringList SteamGenreCandidateFinder::steamSpyByTag(const QString& canonicalGenre)
-{
-    QUrl url(QStringLiteral("https://steamspy.com/api.php"));
-    QUrlQuery query;
-    query.addQueryItem("request", "tag");
-    query.addQueryItem("tag", canonicalGenre);
-    url.setQuery(query);
-
-    QNetworkRequest request(url);
-    std::unique_ptr<QNetworkReply> reply(m_networkManager.get(request));
-    if (!awaitReply(reply.get()) || reply->error() != QNetworkReply::NoError) {
-        logWarning(QStringLiteral("SteamSpy tag request failed for %1").arg(canonicalGenre));
-        return {};
-    }
-
-    const auto root = QJsonDocument::fromJson(reply->readAll()).object();
-    return root.keys();
-}
-
 QStringList SteamGenreCandidateFinder::steamSpyTop(const QString& request)
 {
     QUrl url(QStringLiteral("https://steamspy.com/api.php"));
@@ -198,39 +179,48 @@ QStringList SteamGenreCandidateFinder::discover(const QString& canonicalGenre, i
     const bool candidateListStale = (now - state.lastRefreshedAt) > candidateListTtlSeconds;
     const auto officialGenreId = SteamGenreMap::officialGenreIdFor(canonicalGenre);
 
-    // The SteamSpy bulk seed only needs to run once per TTL window, not
-    // every call — it returns (close to) the whole genre/tag in one shot.
+    // The SteamSpy bulk seed (official genres only) only needs to run once
+    // per TTL window, not every call — it returns (close to) the whole
+    // genre in one shot.
     if (candidateListStale && requestBudget > 0) {
-        const QStringList spyIds = officialGenreId ? steamSpyByGenre(canonicalGenre) : steamSpyByTag(canonicalGenre);
-        if (!spyIds.isEmpty()) {
-            repo.addGenreCandidates(sourceId, canonicalGenre, spyIds, now);
-            discovered << spyIds;
-
-            // Only the tag-only path needs a hint: an official-genre-id
-            // discovery's candidates will already correctly carry that
-            // genre in Steam's own appdetails response, but a tag-only
-            // genre (Horror, Shooter, Sci-Fi, ...) structurally can't come
-            // back from that same field — see tagHintsFor()'s comment.
-            if (!officialGenreId) {
-                for (const auto& id : spyIds)
-                    m_tagHints[id] << canonicalGenre;
+        if (officialGenreId) {
+            const QStringList spyIds = steamSpyByGenre(canonicalGenre);
+            if (!spyIds.isEmpty()) {
+                repo.addGenreCandidates(sourceId, canonicalGenre, spyIds, now);
+                discovered << spyIds;
             }
+            --requestBudget;
         }
-        --requestBudget;
         state.lastRefreshedAt = now;
     }
 
-    // Store search pagination only applies to genres with an official id;
-    // tag-only genres rely solely on the SteamSpy bulk seed above.
-    if (officialGenreId && !state.exhausted && requestBudget > 0) {
+    // Store search pagination: by official genre id where Steam has one,
+    // otherwise by user-tag id (Horror, Roguelike, Cyberpunk, ...), both
+    // ranked by reviews.
+    QList<QPair<QString, QString>> searchFilter;
+    if (officialGenreId)
+        searchFilter = {{QStringLiteral("genre"), QString::number(*officialGenreId)}};
+    else if (const auto tagId = SteamGenreMap::tagIdFor(canonicalGenre))
+        searchFilter = {{QStringLiteral("tags"), QString::number(*tagId)}};
+
+    if (!searchFilter.isEmpty() && !state.exhausted && requestBudget > 0) {
         bool hasMore = false;
-        const QStringList pageIds = searchStorePage(*officialGenreId, state.lastSearchStart, kSearchPageSize, &hasMore);
+        searchFilter << QPair<QString, QString>{QStringLiteral("sort_by"), QStringLiteral("Reviews_DESC")};
+        const QStringList pageIds = searchStore(searchFilter, state.lastSearchStart, kSearchPageSize, &hasMore);
         if (!pageIds.isEmpty()) {
             repo.addGenreCandidates(sourceId, canonicalGenre, pageIds, now);
             discovered << pageIds;
+            // A tag-only genre isn't in appdetails' own genres field, so
+            // remember which ids were found *because* of it (see
+            // tagHintsFor()); the app's tag list confirms it at fetch time.
+            if (!officialGenreId) {
+                for (const auto& id : pageIds)
+                    m_tagHints[id] << canonicalGenre;
+            }
         }
         state.lastSearchStart += kSearchPageSize;
         state.exhausted = !hasMore;
+        state.lastRefreshedAt = now;
         --requestBudget;
     }
 

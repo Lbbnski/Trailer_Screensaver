@@ -21,6 +21,10 @@ Linux.
   ones play directly, others fall back the same way Steam's do). Both extra
   sources are off by default — IGDB needs a free Twitch developer app, GOG
   needs no setup at all (see Settings below).
+- **~130 genre and tag categories**, covering Steam's official genres and
+  its user tags plus GOG's genres and tags (Roguelike, Souls-like, Cozy,
+  Cyberpunk, Turn-Based, Point & Click, perspectives, art styles, content
+  tags, ...). Each source's own vocabulary is mapped onto one shared list.
 - **Genre and age filtering**, allow-list or block-list, plus a "prefer
   popular / most-played games" option (backed by SteamSpy's top-played
   lists).
@@ -58,8 +62,8 @@ Linux.
 ## How it works, briefly
 
 Discovery and filtering are driven entirely by Steam's own storefront data
-(genres, age rating, content descriptors) plus SteamSpy for bulk
-genre/tag/popularity lookups. Trailer video comes from Steam's CDN when a
+(genres, user tags, age rating, content descriptors) plus SteamSpy for bulk
+popularity lookups. Trailer video comes from Steam's CDN when a
 game has one; otherwise `yt-dlp` searches YouTube for it, and mpv (via its
 render API, embedded directly in the app's window rather than opening its
 own) plays the result. Everything discovered is cached in a local SQLite

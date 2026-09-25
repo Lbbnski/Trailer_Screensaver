@@ -12,7 +12,7 @@ class YoutubeFallbackResolver;
 
 // A third IMetadataSource implementation, alongside Steam and IGDB — see
 // docs/ARCHITECTURE.md#extensibility. No API key or auth needed;
-// embed.gog.com/games/ajax/filtered and api.gog.com/products/{id} are both
+// catalog.gog.com/v1/catalog and api.gog.com/products/{id} are both
 // fully public.
 //
 // GOG's API shape is genuinely different from Steam's and IGDB's: one

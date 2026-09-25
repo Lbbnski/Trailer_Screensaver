@@ -3,6 +3,7 @@
 #include "sources/SourceTypes.h"
 
 #include <QString>
+#include <QStringList>
 #include <optional>
 
 class QNetworkAccessManager;
@@ -34,6 +35,14 @@ public:
     std::optional<TrailerCandidate> fetchDetails(const QString& appid);
 
 private:
+    // The canonical genres an app's Steam *user tags* map to (Roguelike,
+    // Cyberpunk, Cozy, ...). appdetails only returns Steam's dozen official
+    // genres, so tags come from a second keyless call,
+    // IStoreBrowseService/GetItems, which returns the app's tag ids ranked
+    // by vote weight. Empty on any failure — the official genres alone are
+    // still a usable (if coarser) classification.
+    QStringList fetchTagGenres(const QString& appid);
+
     QNetworkAccessManager& m_networkManager;
     QString m_language;
     QString m_countryCode;

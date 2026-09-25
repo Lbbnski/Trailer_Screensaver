@@ -9,6 +9,7 @@ class TestIgdbGenreMap : public QObject {
 private slots:
     void mapsKnownGenreThemeAndGameModeLabels();
     void passesThroughUnknownLabelsUnchanged();
+    void specificLabelsImplyBroadAndNarrowGenres();
     void apicalypseFilterCoversEveryMappedCanonicalGenre();
     void apicalypseFilterIsNulloptForGenresIgdbCannotExpress();
 };
@@ -34,8 +35,18 @@ void TestIgdbGenreMap::mapsKnownGenreThemeAndGameModeLabels()
 void TestIgdbGenreMap::passesThroughUnknownLabelsUnchanged()
 {
     // IGDB genres with no canonical equivalent — see header comment.
-    QCOMPARE(IgdbGenreMap::toCanonical("MOBA"), QStringLiteral("MOBA"));
-    QCOMPARE(IgdbGenreMap::toCanonical("Card & Board Game"), QStringLiteral("Card & Board Game"));
+    QCOMPARE(IgdbGenreMap::toCanonical("Non-fiction"), QStringLiteral("Non-fiction"));
+    QCOMPARE(IgdbGenreMap::toCanonical("Kids"), QStringLiteral("Kids"));
+}
+
+void TestIgdbGenreMap::specificLabelsImplyBroadAndNarrowGenres()
+{
+    QCOMPARE(IgdbGenreMap::toCanonicalAll("Real Time Strategy (RTS)"),
+             QStringList({"Strategy", "Real-Time Strategy"}));
+    QCOMPARE(IgdbGenreMap::toCanonicalAll("Card & Board Game"), QStringList({"Card Game", "Board Game"}));
+    // No narrower genre: just the one-to-one mapping.
+    QCOMPARE(IgdbGenreMap::toCanonicalAll("Horror"), QStringList({"Horror"}));
+    QCOMPARE(IgdbGenreMap::toCanonicalAll("Warfare"), QStringList({"War"}));
 }
 
 void TestIgdbGenreMap::apicalypseFilterCoversEveryMappedCanonicalGenre()

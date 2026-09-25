@@ -24,6 +24,10 @@ public:
     // Fixed list shown in SettingsDialog's genre picker, in display order.
     static const QStringList& canonicalGenres();
 
+    // How many entries at the front of canonicalGenres() are the original
+    // list from before the taxonomy grew (see Config's legacy migration).
+    static constexpr int kLegacyGenreCount = 23;
+
     // True if `genre` is a recognized canonical genre name.
     static bool isCanonical(const QString& genre);
 };
